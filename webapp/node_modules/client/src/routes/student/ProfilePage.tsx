@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { motion } from "motion/react";
 import { api, ApiError } from "../../lib/apiClient";
+import { notify } from "../../lib/toast";
+import { staggerContainer, fadeInUp } from "../../lib/motion";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { FullPageSpinner } from "../../components/ui/Spinner";
+import { Field, Input } from "../../components/ui/Field";
+import { Skeleton } from "../../components/ui/Skeleton";
 
 interface Profile {
   id: number;
@@ -47,59 +50,92 @@ export function ProfilePage() {
     onSuccess: (profile) => {
       qc.setQueryData(["students", "me"], profile);
       setForm((f) => ({ ...f, newPassword: "" }));
-      toast.success("Profile updated");
+      notify.success("Profile updated");
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Update failed"),
+    onError: (err) => notify.error(err instanceof ApiError ? err.message : "Update failed"),
   });
 
-  if (isLoading || !data) return <FullPageSpinner />;
-
-  function field<K extends keyof typeof form>(key: K, label: string, type = "text") {
+  if (isLoading || !data) {
     return (
-      <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-        {label}
-        <input
-          type={type}
-          value={form[key]}
-          onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-          className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-        />
-      </label>
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-7 w-40" />
+        <Card className="max-w-xl">
+          <div className="flex flex-col gap-5">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i}>
+                <Skeleton className="mb-2 h-3 w-24" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
     );
   }
 
+  const set = <K extends keyof typeof form>(key: K, value: string) => setForm((f) => ({ ...f, [key]: value }));
+
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Profile</h1>
-      <Card className="max-w-xl">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            update.mutate();
-          }}
-          className="flex flex-col gap-4"
-        >
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            Email (read-only)
-            <input
-              disabled
-              value={data.email}
-              className="rounded-xl border border-slate-200 bg-slate-100 px-3 py-2.5 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400"
-            />
-          </label>
-          {field("name", "Full name")}
-          <div className="grid grid-cols-2 gap-4">
-            {field("contactNo", "Contact no.")}
-            {field("city", "City")}
-          </div>
-          {field("address", "Address")}
-          {field("pincode", "Pincode")}
-          {field("newPassword", "New password (leave blank to keep current)", "password")}
-          <Button type="submit" disabled={update.isPending} className="mt-2 self-start">
-            {update.isPending ? "Saving..." : "Save changes"}
-          </Button>
-        </form>
-      </Card>
-    </div>
+    <motion.div variants={staggerContainer(2)} initial="hidden" animate="show" className="flex flex-col gap-6">
+      <motion.div variants={fadeInUp}>
+        <h1 className="text-2xl font-bold tracking-tight text-fg">Profile</h1>
+        <p className="text-sm text-fg-muted">Update your details or change your password.</p>
+      </motion.div>
+
+      <motion.div variants={fadeInUp}>
+        <Card className="max-w-xl">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              update.mutate();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <Field label="Email" hint="Your email can't be changed here — contact an administrator.">
+              {(id) => <Input id={id} disabled value={data.email} />}
+            </Field>
+
+            <Field label="Full name" required>
+              {(id) => <Input id={id} required value={form.name} onChange={(e) => set("name", e.target.value)} />}
+            </Field>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Contact no.">
+                {(id) => <Input id={id} value={form.contactNo} onChange={(e) => set("contactNo", e.target.value)} />}
+              </Field>
+              <Field label="City">
+                {(id) => <Input id={id} value={form.city} onChange={(e) => set("city", e.target.value)} />}
+              </Field>
+            </div>
+
+            <Field label="Address">
+              {(id) => <Input id={id} value={form.address} onChange={(e) => set("address", e.target.value)} />}
+            </Field>
+
+            <Field label="Pincode">
+              {(id) => <Input id={id} value={form.pincode} onChange={(e) => set("pincode", e.target.value)} />}
+            </Field>
+
+            <div className="mt-2 border-t border-border-subtle pt-5">
+              <Field label="New password" hint="Leave blank to keep your current password. Minimum 6 characters.">
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="password"
+                    autoComplete="new-password"
+                    value={form.newPassword}
+                    onChange={(e) => set("newPassword", e.target.value)}
+                  />
+                )}
+              </Field>
+            </div>
+
+            <Button type="submit" loading={update.isPending} className="mt-2 self-start">
+              Save changes
+            </Button>
+          </form>
+        </Card>
+      </motion.div>
+    </motion.div>
   );
 }

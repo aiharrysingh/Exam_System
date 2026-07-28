@@ -1,41 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 import { api, ApiError } from "../../lib/apiClient";
-import type { AdminQuestion } from "../../lib/types";
-import { Card } from "../../components/ui/Card";
+import { notify } from "../../lib/toast";
+import type { AdminQuestion, QuestionType } from "../../lib/types";
+import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
+import { Field, Input, Textarea } from "../../components/ui/Field";
 
-const TYPE_LABELS: Record<string, string> = {
+const TYPE_LABELS: Record<QuestionType, string> = {
   SINGLE_CHOICE: "Single choice",
   MULTI_SELECT: "Multiple select",
   TRUE_FALSE: "True / False",
   SHORT_ANSWER: "Short answer",
 };
 
-/** Shared by TestQuestionsPage and QuestionBankPage — editing a bank question's
- * core fields and (for choice-based types) its existing options. Type and option
- * count are fixed once created; recreate the question to change either. */
+/**
+ * Edits a bank question's core fields and its existing options. Type and option
+ * count are fixed once created — changing either would invalidate answers that
+ * already reference those options.
+ *
+ * Always rendered; pass `question={null}` to close. Conditional mounting would
+ * skip the exit animation.
+ */
 export function EditQuestionModal({
   question,
   onClose,
   invalidateKeys,
 }: {
-  question: AdminQuestion;
+  question: AdminQuestion | null;
   onClose: () => void;
   invalidateKeys: unknown[][];
 }) {
   const qc = useQueryClient();
-  const [text, setText] = useState(question.text);
-  const [marks, setMarks] = useState(question.marks);
-  const [negativeMarks, setNegativeMarks] = useState(question.negativeMarks);
-  const [allowPartialCredit, setAllowPartialCredit] = useState(question.allowPartialCredit);
-  const [options, setOptions] = useState(question.options.map((o) => ({ id: o.id, text: o.text, isCorrect: !!o.isCorrect })));
+  const [text, setText] = useState("");
+  const [marks, setMarks] = useState(1);
+  const [negativeMarks, setNegativeMarks] = useState(0);
+  const [allowPartialCredit, setAllowPartialCredit] = useState(false);
+  const [options, setOptions] = useState<{ id: number; text: string; isCorrect: boolean }[]>([]);
 
-  const invalidateAll = () => invalidateKeys.forEach((key) => qc.invalidateQueries({ queryKey: key }));
+  // Re-seed local state each time a different question is opened.
+  useEffect(() => {
+    if (!question) return;
+    setText(question.text);
+    setMarks(question.marks);
+    setNegativeMarks(question.negativeMarks);
+    setAllowPartialCredit(question.allowPartialCredit);
+    setOptions(question.options.map((o) => ({ id: o.id, text: o.text, isCorrect: !!o.isCorrect })));
+  }, [question]);
 
   const save = useMutation({
     mutationFn: async () => {
+      if (!question) return;
       await api.put(`/questions/${question.id}`, {
         text,
         marks,
@@ -47,99 +62,112 @@ export function EditQuestionModal({
       }
     },
     onSuccess: () => {
-      invalidateAll();
+      invalidateKeys.forEach((key) => qc.invalidateQueries({ queryKey: key }));
       onClose();
-      toast.success("Question updated");
+      notify.success("Question updated");
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Could not update question"),
+    onError: (err) => notify.error(err instanceof ApiError ? err.message : "Could not update question"),
   });
 
-  const isMulti = question.type === "MULTI_SELECT";
+  const isMulti = question?.type === "MULTI_SELECT";
+  const showNegative = question?.type === "SINGLE_CHOICE" || question?.type === "TRUE_FALSE";
 
   function toggleCorrect(i: number) {
-    setOptions((opts) => opts.map((o, idx) => (isMulti ? (idx === i ? { ...o, isCorrect: !o.isCorrect } : o) : { ...o, isCorrect: idx === i })));
+    setOptions((opts) =>
+      opts.map((o, idx) => (isMulti ? (idx === i ? { ...o, isCorrect: !o.isCorrect } : o) : { ...o, isCorrect: idx === i }))
+    );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
-        <h2 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white">Edit question</h2>
-        <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">{TYPE_LABELS[question.type]} (type can't be changed)</p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate();
-          }}
-          className="flex flex-col gap-4"
-        >
-          <textarea
-            required
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
+    <Modal
+      open={!!question}
+      onClose={onClose}
+      title="Edit question"
+      description={question ? `${TYPE_LABELS[question.type]} — type and option count can't be changed` : undefined}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button form="edit-question-form" type="submit" loading={save.isPending}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="edit-question-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+        className="flex flex-col gap-4"
+      >
+        <Field label="Question" required>
+          {(id) => <Textarea id={id} required rows={3} value={text} onChange={(e) => setText(e.target.value)} />}
+        </Field>
 
-          <div className="grid grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-              Marks
-              <input
-                type="number"
-                min={1}
-                value={marks}
-                onChange={(e) => setMarks(Number(e.target.value))}
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </label>
-            {(question.type === "SINGLE_CHOICE" || question.type === "TRUE_FALSE") && (
-              <label className="flex flex-col gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Negative marks (if wrong)
-                <input
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Marks" required>
+            {(id) => (
+              <Input id={id} type="number" min={1} value={marks} onChange={(e) => setMarks(Number(e.target.value))} />
+            )}
+          </Field>
+          {showNegative && (
+            <Field label="Negative marks" hint="Applied only when answered incorrectly.">
+              {(id) => (
+                <Input
+                  id={id}
                   type="number"
                   min={0}
                   value={negativeMarks}
                   onChange={(e) => setNegativeMarks(Number(e.target.value))}
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
-              </label>
-            )}
-          </div>
-
-          {isMulti && (
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-              <input type="checkbox" checked={allowPartialCredit} onChange={(e) => setAllowPartialCredit(e.target.checked)} />
-              Allow partial credit for partially-correct selections
-            </label>
+              )}
+            </Field>
           )}
+        </div>
 
-          {options.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                {isMulti ? "Options (check every correct one)" : "Options (select the correct one)"}
-              </p>
-              {options.map((o, i) => (
-                <div key={o.id} className="flex items-center gap-2">
-                  <input type={isMulti ? "checkbox" : "radio"} name="correct" checked={o.isCorrect} onChange={() => toggleCorrect(i)} />
-                  <input
-                    required
-                    value={o.text}
-                    onChange={(e) => setOptions((opts) => opts.map((opt, idx) => (idx === i ? { ...opt, text: e.target.value } : opt)))}
-                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
+        {isMulti && (
+          <label className="flex items-center gap-2 text-sm font-medium text-fg-secondary">
+            <input
+              type="checkbox"
+              checked={allowPartialCredit}
+              onChange={(e) => setAllowPartialCredit(e.target.checked)}
+              className="accent-brand-600"
+            />
+            Award partial credit for partially-correct selections
+          </label>
+        )}
 
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={save.isPending}>
-              Save changes
-            </Button>
+        {options.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-semibold text-fg-secondary">
+              {isMulti ? "Options — check every correct one" : "Options — select the correct one"}
+            </p>
+            {options.map((o, i) => (
+              <div key={o.id} className="flex items-center gap-2.5">
+                <input
+                  type={isMulti ? "checkbox" : "radio"}
+                  name="correct-option"
+                  checked={o.isCorrect}
+                  onChange={() => toggleCorrect(i)}
+                  aria-label={`Mark option ${i + 1} correct`}
+                  className="accent-brand-600"
+                />
+                <Input
+                  required
+                  aria-label={`Option ${i + 1}`}
+                  value={o.text}
+                  onChange={(e) =>
+                    setOptions((opts) => opts.map((opt, idx) => (idx === i ? { ...opt, text: e.target.value } : opt)))
+                  }
+                />
+              </div>
+            ))}
           </div>
-        </form>
-      </Card>
-    </div>
+        )}
+      </form>
+    </Modal>
   );
 }

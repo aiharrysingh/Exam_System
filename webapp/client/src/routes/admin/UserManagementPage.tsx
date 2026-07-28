@@ -1,11 +1,18 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { motion } from "motion/react";
+import clsx from "clsx";
 import { api, ApiError } from "../../lib/apiClient";
+import { notify } from "../../lib/toast";
 import type { ManagedUser, Role } from "../../lib/types";
+import { staggerContainer, fadeInUp, duration } from "../../lib/motion";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
-import { FullPageSpinner } from "../../components/ui/Spinner";
+import { Icon } from "../../components/ui/Icon";
+import { Modal } from "../../components/ui/Modal";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
+import { Field, Input } from "../../components/ui/Field";
+import { SkeletonList } from "../../components/ui/Skeleton";
 import { EmptyState } from "../../components/ui/EmptyState";
 
 const TABS: { role: Role; label: string }[] = [
@@ -15,8 +22,9 @@ const TABS: { role: Role; label: string }[] = [
 
 export function UserManagementPage() {
   const [role, setRole] = useState<Role>("STUDENT");
-  const [showForm, setShowForm] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ManagedUser | null>(null);
   const qc = useQueryClient();
 
   const users = useQuery({
@@ -28,252 +36,282 @@ export function UserManagementPage() {
 
   const remove = useMutation({
     mutationFn: (id: number) => api.delete(`/admin/users/${id}`),
-    onSuccess: invalidate,
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Could not delete this account"),
+    onSuccess: () => {
+      invalidate();
+      notify.success("Account deleted");
+    },
+    onError: (err) =>
+      notify.error(
+        err instanceof ApiError ? err.message : "Could not delete — the account may still own content or have attempts"
+      ),
   });
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Users</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Manage student and test-conductor accounts.</p>
-        </div>
-        <Button onClick={() => setShowForm(true)}>New {role === "STUDENT" ? "student" : "test conductor"}</Button>
-      </div>
+  const noun = role === "STUDENT" ? "student" : "test conductor";
 
-      <div className="flex gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t.role}
-            onClick={() => setRole(t.role)}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              role === t.role
-                ? "bg-brand-600 text-white"
-                : "bg-white text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+  return (
+    <motion.div variants={staggerContainer(4)} initial="hidden" animate="show" className="flex flex-col gap-6">
+      <motion.div variants={fadeInUp} className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Users</h1>
+          <p className="text-sm text-fg-muted">
+            Manage student and test-conductor accounts. Test conductors can only be created here.
+          </p>
+        </div>
+        <Button onClick={() => setShowCreate(true)} iconLeft={<Icon name="plus" size={16} />}>
+          New {noun}
+        </Button>
+      </motion.div>
+
+      {/* Segmented control with a sliding indicator */}
+      <motion.div variants={fadeInUp}>
+        <div
+          role="tablist"
+          aria-label="Account type"
+          className="inline-flex gap-1 rounded-lg border border-border-subtle bg-surface-2 p-1"
+        >
+          {TABS.map((t) => {
+            const active = role === t.role;
+            return (
+              <button
+                key={t.role}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setRole(t.role)}
+                className="relative rounded-md px-4 py-1.5 text-sm font-semibold transition-colors"
+              >
+                {active && (
+                  <motion.span
+                    layoutId="user-tab"
+                    transition={{ duration: duration.base }}
+                    className="absolute inset-0 rounded-md bg-surface-1 shadow-e1"
+                  />
+                )}
+                <span className={clsx("relative", active ? "text-fg" : "text-fg-muted hover:text-fg-secondary")}>
+                  {t.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </motion.div>
 
       {users.isLoading ? (
-        <FullPageSpinner />
+        <SkeletonList rows={3} />
       ) : !users.data || users.data.length === 0 ? (
-        <EmptyState title="No accounts yet" />
+        <motion.div variants={fadeInUp}>
+          <EmptyState
+            icon={<Icon name="users" size={26} />}
+            title={`No ${noun}s yet`}
+            description={
+              role === "STUDENT"
+                ? "Students can also register themselves from the sign-in page."
+                : "Test conductors author their own subjects, tests, and questions."
+            }
+            action={<Button onClick={() => setShowCreate(true)}>Create a {noun}</Button>}
+          />
+        </motion.div>
       ) : (
-        <Card className="overflow-x-auto p-0">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
-              <tr>
-                <th className="px-5 py-3">Name</th>
-                <th className="px-5 py-3">Email</th>
-                <th className="px-5 py-3">City</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.data.map((u) => (
-                <tr key={u.id} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
-                  <td className="px-5 py-3 font-medium text-slate-800 dark:text-slate-100">{u.name}</td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{u.email}</td>
-                  <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{u.city ?? "—"}</td>
-                  <td className="px-5 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="secondary" onClick={() => setEditingUser(u)}>
-                        Edit
-                      </Button>
-                      <Button
-                        variant="danger"
-                        onClick={() => window.confirm(`Delete ${u.name}?`) && remove.mutate(u.id)}
-                        disabled={remove.isPending}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+        <motion.div variants={fadeInUp}>
+          <Card padding="none" className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-border-subtle bg-surface-2 text-2xs uppercase tracking-wider text-fg-muted">
+                  <tr>
+                    <th className="px-5 py-3 font-semibold">Name</th>
+                    <th className="px-5 py-3 font-semibold">Email</th>
+                    <th className="px-5 py-3 font-semibold">City</th>
+                    <th className="px-5 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.data.map((u) => (
+                    <tr key={u.id} className="border-b border-border-subtle last:border-0">
+                      <td className="px-5 py-3 font-medium text-fg">{u.name}</td>
+                      <td className="px-5 py-3 text-fg-secondary">{u.email}</td>
+                      <td className="px-5 py-3 text-fg-muted">{u.city ?? "—"}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="secondary" size="sm" onClick={() => setEditingUser(u)}>
+                            Edit
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setPendingDelete(u)}>
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </motion.div>
       )}
 
-      {showForm && <NewUserModal role={role} onClose={() => setShowForm(false)} onCreated={invalidate} />}
-      {editingUser && <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} onSaved={invalidate} />}
-    </div>
+      <UserFormModal open={showCreate} role={role} onClose={() => setShowCreate(false)} onSaved={invalidate} />
+      <UserFormModal
+        open={!!editingUser}
+        role={role}
+        existingUser={editingUser ?? undefined}
+        onClose={() => setEditingUser(null)}
+        onSaved={invalidate}
+      />
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onClose={() => setPendingDelete(null)}
+        onConfirm={() => {
+          if (pendingDelete) remove.mutate(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+        title="Delete this account?"
+        body={
+          <>
+            <span className="font-semibold text-fg">{pendingDelete?.name}</span> will lose access immediately. This
+            fails if the account still owns subjects, tests, or questions, or has any attempt history.
+          </>
+        }
+        confirmLabel="Delete account"
+      />
+    </motion.div>
   );
 }
 
-function EditUserModal({ user, onClose, onSaved }: { user: ManagedUser; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({
-    name: user.name,
-    contactNo: user.contactNo ?? "",
-    address: user.address ?? "",
-    city: user.city ?? "",
-    pincode: user.pincode ?? "",
-    newPassword: "",
-  });
+function UserFormModal({
+  open,
+  role,
+  existingUser,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  role: Role;
+  existingUser?: ManagedUser;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const isEdit = !!existingUser;
+  const blank = { name: "", email: "", password: "", contactNo: "", address: "", city: "", pincode: "" };
+  const [form, setForm] = useState(blank);
+
+  const seedKey = existingUser?.id ?? "new";
+  const [seededFor, setSeededFor] = useState<string | number>(seedKey);
+  if (open && seededFor !== seedKey) {
+    setSeededFor(seedKey);
+    setForm(
+      existingUser
+        ? {
+            name: existingUser.name,
+            email: existingUser.email,
+            password: "",
+            contactNo: existingUser.contactNo ?? "",
+            address: existingUser.address ?? "",
+            city: existingUser.city ?? "",
+            pincode: existingUser.pincode ?? "",
+          }
+        : blank
+    );
+  }
 
   const save = useMutation({
     mutationFn: () =>
-      api.put(`/admin/users/${user.id}`, {
-        name: form.name,
-        contactNo: form.contactNo,
-        address: form.address,
-        city: form.city,
-        pincode: form.pincode,
-        ...(form.newPassword ? { newPassword: form.newPassword } : {}),
-      }),
+      isEdit
+        ? api.put(`/admin/users/${existingUser!.id}`, {
+            name: form.name,
+            contactNo: form.contactNo,
+            address: form.address,
+            city: form.city,
+            pincode: form.pincode,
+            ...(form.password ? { newPassword: form.password } : {}),
+          })
+        : api.post("/admin/users", { ...form, role }),
     onSuccess: () => {
       onSaved();
       onClose();
-      toast.success("Account updated");
+      notify.success(isEdit ? "Account updated" : "Account created");
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Could not update this account"),
+    onError: (err) =>
+      notify.error(err instanceof ApiError ? err.message : `Could not ${isEdit ? "update" : "create"} account`),
   });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <Card className="w-full max-w-sm">
-        <h2 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white">Edit {user.name}</h2>
-        <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">{user.email} (email can't be changed here)</p>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            save.mutate();
-          }}
-          className="flex flex-col gap-4"
-        >
-          <input
-            required
-            placeholder="Full name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <input
-              placeholder="Contact no."
-              value={form.contactNo}
-              onChange={(e) => setForm({ ...form, contactNo: e.target.value })}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
-            <input
-              placeholder="City"
-              value={form.city}
-              onChange={(e) => setForm({ ...form, city: e.target.value })}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
-          </div>
-          <input
-            placeholder="Address"
-            value={form.address}
-            onChange={(e) => setForm({ ...form, address: e.target.value })}
-            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
-          <input
-            placeholder="Pincode"
-            value={form.pincode}
-            onChange={(e) => setForm({ ...form, pincode: e.target.value })}
-            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
-          <input
-            type="password"
-            minLength={6}
-            placeholder="New password (leave blank to keep current)"
-            value={form.newPassword}
-            onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={save.isPending}>
-              Save changes
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
-  );
-}
-
-function NewUserModal({ role, onClose, onCreated }: { role: Role; onClose: () => void; onCreated: () => void }) {
-  const [form, setForm] = useState({ name: "", email: "", password: "", contactNo: "", city: "" });
-
-  const create = useMutation({
-    mutationFn: () => api.post("/admin/users", { ...form, role }),
-    onSuccess: () => {
-      onCreated();
-      onClose();
-    },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Could not create account"),
-  });
+  const set = <K extends keyof typeof form>(key: K, value: string) => setForm((f) => ({ ...f, [key]: value }));
+  const noun = role === "STUDENT" ? "student" : "test conductor";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <Card className="w-full max-w-sm">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">
-          New {role === "STUDENT" ? "student" : "test conductor"}
-        </h2>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate();
-          }}
-          className="flex flex-col gap-4"
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? `Edit ${existingUser?.name}` : `New ${noun}`}
+      description={isEdit ? existingUser?.email : undefined}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button form="user-form" type="submit" loading={save.isPending}>
+            {isEdit ? "Save changes" : "Create account"}
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="user-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate();
+        }}
+        className="flex flex-col gap-4"
+      >
+        <Field label="Full name" required>
+          {(id) => <Input id={id} required value={form.name} onChange={(e) => set("name", e.target.value)} />}
+        </Field>
+
+        {!isEdit && (
+          <Field label="Email" required>
+            {(id) => (
+              <Input id={id} type="email" required value={form.email} onChange={(e) => set("email", e.target.value)} />
+            )}
+          </Field>
+        )}
+
+        <Field
+          label={isEdit ? "New password" : "Password"}
+          hint={isEdit ? "Leave blank to keep the current password." : "Minimum 6 characters."}
+          required={!isEdit}
         >
-          <input
-            required
-            placeholder="Full name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
-          <input
-            required
-            type="email"
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
-          <input
-            required
-            type="password"
-            minLength={6}
-            placeholder="Password"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-          />
+          {(id) => (
+            <Input
+              id={id}
+              type="password"
+              autoComplete="new-password"
+              required={!isEdit}
+              minLength={6}
+              value={form.password}
+              onChange={(e) => set("password", e.target.value)}
+            />
+          )}
+        </Field>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Contact no.">
+            {(id) => <Input id={id} value={form.contactNo} onChange={(e) => set("contactNo", e.target.value)} />}
+          </Field>
+          <Field label="City">
+            {(id) => <Input id={id} value={form.city} onChange={(e) => set("city", e.target.value)} />}
+          </Field>
+        </div>
+
+        {isEdit && (
           <div className="grid grid-cols-2 gap-4">
-            <input
-              placeholder="Contact no."
-              value={form.contactNo}
-              onChange={(e) => setForm({ ...form, contactNo: e.target.value })}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
-            <input
-              placeholder="City"
-              value={form.city}
-              onChange={(e) => setForm({ ...form, city: e.target.value })}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
+            <Field label="Address">
+              {(id) => <Input id={id} value={form.address} onChange={(e) => set("address", e.target.value)} />}
+            </Field>
+            <Field label="Pincode">
+              {(id) => <Input id={id} value={form.pincode} onChange={(e) => set("pincode", e.target.value)} />}
+            </Field>
           </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={create.isPending}>
-              Create
-            </Button>
-          </div>
-        </form>
-      </Card>
-    </div>
+        )}
+      </form>
+    </Modal>
   );
 }

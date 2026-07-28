@@ -116,13 +116,12 @@ export function TestQuestionsPage() {
       {showBankPicker && (
         <BankPickerModal testId={Number(testId)} onClose={() => setShowBankPicker(false)} onAttached={invalidate} />
       )}
-      {editingQuestion && (
-        <EditQuestionModal
-          question={editingQuestion}
-          onClose={() => setEditingQuestion(null)}
-          invalidateKeys={[["admin", "tests", testId, "questions"], ["questions", "bank"]]}
-        />
-      )}
+      {/* Always mounted — conditional mounting would skip the exit animation. */}
+      <EditQuestionModal
+        question={editingQuestion}
+        onClose={() => setEditingQuestion(null)}
+        invalidateKeys={[["admin", "tests", testId, "questions"], ["questions", "bank"]]}
+      />
     </div>
   );
 }
