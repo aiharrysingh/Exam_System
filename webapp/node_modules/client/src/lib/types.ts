@@ -194,6 +194,10 @@ export interface ItemAnalysisRow {
   text: string;
   type: QuestionType;
   attemptsCount: number;
+  /** Answers with a final mark. `pValue` is computed over these only. */
+  gradedCount: number;
+  /** Short answers still awaiting manual review — excluded from `pValue`. */
+  pendingCount: number;
   pValue: number | null;
   avgTimeSpentSec: number;
 }

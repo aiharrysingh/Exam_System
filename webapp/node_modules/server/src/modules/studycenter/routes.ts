@@ -117,7 +117,13 @@ router.get(
           select: { awardedMarks: true, timeSpentSec: true },
         });
         const attemptsCount = answers.length;
-        const correctCount = answers.filter((a) => (a.awardedMarks ?? 0) >= question.marks).length;
+
+        // A short answer awaiting manual review has awardedMarks === null. Counting
+        // those as incorrect would make any ungraded question look artificially
+        // hard, so the difficulty ratio is over GRADED answers only. Time spent
+        // is still averaged over every attempt — that data is complete.
+        const graded = answers.filter((a) => a.awardedMarks !== null);
+        const correctCount = graded.filter((a) => (a.awardedMarks ?? 0) >= question.marks).length;
         const avgTimeSpentSec = attemptsCount
           ? Math.round(answers.reduce((s, a) => s + a.timeSpentSec, 0) / attemptsCount)
           : 0;
@@ -126,7 +132,9 @@ router.get(
           text: question.text,
           type: question.type,
           attemptsCount,
-          pValue: attemptsCount ? Number((correctCount / attemptsCount).toFixed(2)) : null,
+          gradedCount: graded.length,
+          pendingCount: attemptsCount - graded.length,
+          pValue: graded.length ? Number((correctCount / graded.length).toFixed(2)) : null,
           avgTimeSpentSec,
         };
       })
