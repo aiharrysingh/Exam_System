@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(winget --version)",
+      "Bash(mkdir -p \"c:/Users/signity/Desktop/DM Tool/Exam_System/webapp/server/src\" && ls \"c:/Users/signity/Desktop/DM Tool/Exam_System/webapp\")",
+      "Bash(npm create *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\signity\\Desktop\\DM Tool\\Exam_System\\webapp\\server"
+    ]
+  }
+}

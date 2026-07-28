@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+  STUDY_CENTER
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  EXPIRED
+}
+
+enum AnswerState {
+  UNANSWERED
+  ANSWERED
+  MARKED_FOR_REVIEW
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  role         Role
+  name         String
+  email        String   @unique
+  passwordHash String
+  contactNo    String?
+  address      String?
+  city         String?
+  pincode      String?
+  createdAt    DateTime @default(now())
+
+  attempts     Attempt[]
+}
+
+model Subject {
+  id    Int    @id @default(autoincrement())
+  name  String
+  tests Test[]
+}
+
+model Test {
+  id            Int      @id @default(autoincrement())
+  name          String
+  description   String?
+  code          String   @unique
+  subjectId     Int
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  durationMin   Int
+  availableFrom DateTime @default(now())
+  availableTo   DateTime
+  isPractice    Boolean  @default(false)
+  isPublished   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  questions Question[]
+  attempts  Attempt[]
+}
+
+model Question {
+  id     Int    @id @default(autoincrement())
+  testId Int
+  test   Test   @relation(fields: [testId], references: [id], onDelete: Cascade)
+  text   String
+  marks  Int    @default(1)
+  order  Int
+
+  options Option[]
+  answers Answer[]
+}
+
+model Option {
+  id         Int      @id @default(autoincrement())
+  questionId Int
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  isCorrect  Boolean  @default(false)
+  order      Int
+
+  selectedInAnswers Answer[]
+}
+
+model Attempt {
+  id        Int           @id @default(autoincrement())
+  studentId Int
+  student   User          @relation(fields: [studentId], references: [id])
+  testId    Int
+  test      Test          @relation(fields: [testId], references: [id])
+  startTime DateTime      @default(now())
+  deadline  DateTime
+  endTime   DateTime?
+  status    AttemptStatus @default(IN_PROGRESS)
+  score     Int?
+
+  answers Answer[]
+
+  @@unique([studentId, testId])
+}
+
+model Answer {
+  id               Int         @id @default(autoincrement())
+  attemptId        Int
+  attempt          Attempt     @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId       Int
+  question         Question    @relation(fields: [questionId], references: [id])
+  selectedOptionId Int?
+  selectedOption   Option?     @relation(fields: [selectedOptionId], references: [id])
+  state            AnswerState @default(UNANSWERED)
+
+  @@unique([attemptId, questionId])
+}
