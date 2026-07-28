@@ -19,6 +19,7 @@ export function AdminTestsPage() {
   const tests = useQuery({ queryKey: ["admin", "tests"], queryFn: () => api.get<AdminTest[]>("/tests") });
   const subjects = useQuery({ queryKey: ["subjects"], queryFn: () => api.get<Subject[]>("/subjects") });
   const [showForm, setShowForm] = useState(false);
+  const [editingTest, setEditingTest] = useState<AdminTest | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "tests"] });
 
@@ -63,9 +64,12 @@ export function AdminTestsPage() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Link to={`/admin/tests/${t.id}/questions`}>
+                <Link to={`/manage/tests/${t.id}/questions`}>
                   <Button variant="secondary">Questions</Button>
                 </Link>
+                <Button variant="secondary" onClick={() => setEditingTest(t)}>
+                  Edit
+                </Button>
                 {!t.isPublished && (
                   <Button onClick={() => publish.mutate(t.id)} disabled={publish.isPending}>
                     Publish
@@ -85,58 +89,74 @@ export function AdminTestsPage() {
       )}
 
       {showForm && subjects.data && (
-        <NewTestModal subjects={subjects.data} onClose={() => setShowForm(false)} onCreated={invalidate} />
+        <TestFormModal subjects={subjects.data} onClose={() => setShowForm(false)} onSaved={invalidate} />
+      )}
+      {editingTest && subjects.data && (
+        <TestFormModal
+          subjects={subjects.data}
+          existingTest={editingTest}
+          onClose={() => setEditingTest(null)}
+          onSaved={invalidate}
+        />
       )}
     </div>
   );
 }
 
-function NewTestModal({
+function TestFormModal({
   subjects,
+  existingTest,
   onClose,
-  onCreated,
+  onSaved,
 }: {
   subjects: Subject[];
+  existingTest?: AdminTest;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }) {
+  const isEdit = !!existingTest;
   const now = new Date();
   const inAWeek = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 7);
   const [form, setForm] = useState({
-    name: "",
-    description: "",
-    code: "",
-    subjectId: subjects[0]?.id ?? 0,
-    durationMin: 20,
-    isPractice: false,
-    availableFrom: toLocalInput(now.toISOString()),
-    availableTo: toLocalInput(inAWeek.toISOString()),
+    name: existingTest?.name ?? "",
+    description: existingTest?.description ?? "",
+    code: existingTest?.code ?? "",
+    subjectId: existingTest?.subject.id ?? subjects[0]?.id ?? 0,
+    durationMin: existingTest?.durationMin ?? 20,
+    isPractice: existingTest?.isPractice ?? false,
+    shuffleQuestions: existingTest?.shuffleQuestions ?? false,
+    poolSize: existingTest?.poolSize ? String(existingTest.poolSize) : "",
+    availableFrom: toLocalInput(existingTest?.availableFrom ?? now.toISOString()),
+    availableTo: toLocalInput(existingTest?.availableTo ?? inAWeek.toISOString()),
   });
 
-  const create = useMutation({
-    mutationFn: () =>
-      api.post("/tests", {
+  const save = useMutation({
+    mutationFn: () => {
+      const payload = {
         ...form,
         subjectId: Number(form.subjectId),
         durationMin: Number(form.durationMin),
+        poolSize: form.poolSize ? Number(form.poolSize) : null,
         availableFrom: new Date(form.availableFrom).toISOString(),
         availableTo: new Date(form.availableTo).toISOString(),
-      }),
+      };
+      return isEdit ? api.put(`/tests/${existingTest!.id}`, payload) : api.post("/tests", payload);
+    },
     onSuccess: () => {
-      onCreated();
+      onSaved();
       onClose();
     },
-    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Could not create test"),
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : `Could not ${isEdit ? "update" : "create"} test`),
   });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <Card className="w-full max-w-lg">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">New test</h2>
+      <Card className="max-h-[90vh] w-full max-w-lg overflow-y-auto">
+        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">{isEdit ? "Edit test" : "New test"}</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            create.mutate();
+            save.mutate();
           }}
           className="flex flex-col gap-4"
         >
@@ -214,12 +234,35 @@ function NewTestModal({
               />
             </label>
           </div>
+          <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+            <p className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">Randomization (optional)</p>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                <input
+                  type="checkbox"
+                  checked={form.shuffleQuestions}
+                  onChange={(e) => setForm({ ...form, shuffleQuestions: e.target.checked })}
+                />
+                Shuffle question order per attempt
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Question pool size (blank = use all)
+                <input
+                  type="number"
+                  min={1}
+                  value={form.poolSize}
+                  onChange={(e) => setForm({ ...form, poolSize: e.target.value })}
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+              </label>
+            </div>
+          </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={create.isPending}>
-              Create test
+            <Button type="submit" disabled={save.isPending}>
+              {isEdit ? "Save changes" : "Create test"}
             </Button>
           </div>
         </form>

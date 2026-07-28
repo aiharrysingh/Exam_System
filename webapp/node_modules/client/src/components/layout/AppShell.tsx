@@ -4,6 +4,15 @@ import { useCurrentUser, useLogout } from "../../lib/useAuth";
 import { Button } from "../ui/Button";
 import { FullPageSpinner } from "../ui/Spinner";
 
+const AUTHORING_NAV = [
+  { to: "/manage/dashboard", label: "Dashboard", icon: "🏠" },
+  { to: "/manage/subjects", label: "Subjects", icon: "📚" },
+  { to: "/manage/tests", label: "Tests & Questions", icon: "🗂️" },
+  { to: "/manage/bank", label: "Question Bank", icon: "🧩" },
+  { to: "/manage/grading", label: "Grading Queue", icon: "✏️" },
+  { to: "/manage/reports", label: "Reports", icon: "📈" },
+];
+
 const NAV: Record<string, { to: string; label: string; icon: string }[]> = {
   STUDENT: [
     { to: "/dashboard", label: "Dashboard", icon: "🏠" },
@@ -11,16 +20,8 @@ const NAV: Record<string, { to: string; label: string; icon: string }[]> = {
     { to: "/results", label: "My Results", icon: "📊" },
     { to: "/profile", label: "Profile", icon: "👤" },
   ],
-  ADMIN: [
-    { to: "/admin/dashboard", label: "Dashboard", icon: "🏠" },
-    { to: "/admin/subjects", label: "Subjects", icon: "📚" },
-    { to: "/admin/tests", label: "Tests & Questions", icon: "🗂️" },
-  ],
-  STUDY_CENTER: [
-    { to: "/studycenter/dashboard", label: "Dashboard", icon: "🏠" },
-    { to: "/studycenter/students", label: "Students", icon: "🎓" },
-    { to: "/studycenter/reports", label: "Reports", icon: "📈" },
-  ],
+  ADMIN: [...AUTHORING_NAV, { to: "/admin/users", label: "Users", icon: "🧑‍🤝‍🧑" }],
+  STUDY_CENTER: AUTHORING_NAV,
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -43,8 +44,8 @@ export function AppShell() {
   const items = NAV[user.role] ?? [];
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 md:flex">
+    <div className="flex h-screen overflow-hidden">
+      <aside className="hidden w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 md:flex">
         <div className="mb-8 flex items-center gap-2 px-1">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-600 to-accent-500 font-bold text-white">
             E
@@ -83,14 +84,14 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 md:hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 md:hidden">
           <span className="font-bold text-slate-900 dark:text-white">ExamHub</span>
           <Button variant="ghost" onClick={() => logout.mutate(undefined, { onSuccess: () => navigate("/login") })}>
             Log out
           </Button>
         </header>
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

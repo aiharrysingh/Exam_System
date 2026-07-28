@@ -35,6 +35,7 @@ export function ResultsListPage() {
                       <Badge tone={r.status === "EXPIRED" ? "warning" : "success"}>
                         {r.status === "EXPIRED" ? "Time expired" : "Submitted"}
                       </Badge>
+                      {r.gradingStatus === "PENDING_REVIEW" && <Badge tone="warning">Pending review</Badge>}
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400">{r.subjectName}</p>
                   </div>

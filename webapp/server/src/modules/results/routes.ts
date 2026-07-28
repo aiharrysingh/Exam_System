@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../../lib/prisma";
 import { asyncHandler, HttpError } from "../../lib/asyncHandler";
 import { authMiddleware } from "../../middleware/auth";
+import { streamCertificate } from "../../lib/certificate";
 
 const router = Router();
 router.use(authMiddleware);
@@ -12,29 +13,26 @@ router.get(
   asyncHandler(async (req, res) => {
     const attempts = await prisma.attempt.findMany({
       where: { studentId: req.user!.userId, status: { in: ["SUBMITTED", "EXPIRED"] } },
-      include: { test: { include: { subject: true } } },
+      include: {
+        test: { include: { subject: true } },
+        answers: { include: { question: { select: { marks: true } } } },
+      },
       orderBy: { endTime: "desc" },
     });
 
-    const results = await Promise.all(
-      attempts.map(async (a) => {
-        const totalMarks = await prisma.question.aggregate({
-          where: { testId: a.testId },
-          _sum: { marks: true },
-        });
-        return {
-          attemptId: a.id,
-          testName: a.test.name,
-          subjectName: a.test.subject.name,
-          status: a.status,
-          startTime: a.startTime,
-          endTime: a.endTime,
-          score: a.score ?? 0,
-          totalMarks: totalMarks._sum.marks ?? 0,
-        };
-      })
+    res.json(
+      attempts.map((a) => ({
+        attemptId: a.id,
+        testName: a.test.name,
+        subjectName: a.test.subject.name,
+        status: a.status,
+        gradingStatus: a.gradingStatus,
+        startTime: a.startTime,
+        endTime: a.endTime,
+        score: a.score ?? 0,
+        totalMarks: a.answers.reduce((sum, ans) => sum + ans.question.marks, 0),
+      }))
     );
-    res.json(results);
   })
 );
 
@@ -49,8 +47,9 @@ router.get(
     if (!attempt) throw new HttpError(404, "Result not found");
 
     const isOwner = attempt.studentId === req.user!.userId;
-    const isReviewer = req.user!.role === "ADMIN" || req.user!.role === "STUDY_CENTER";
-    if (!isOwner && !isReviewer) throw new HttpError(403, "Forbidden");
+    const isAdmin = req.user!.role === "ADMIN";
+    const isOwningReviewer = req.user!.role === "STUDY_CENTER" && attempt.test.ownerId === req.user!.userId;
+    if (!isOwner && !isAdmin && !isOwningReviewer) throw new HttpError(403, "Forbidden");
 
     if (attempt.status === "IN_PROGRESS") {
       throw new HttpError(409, "This attempt has not finished yet");
@@ -60,9 +59,9 @@ router.get(
       where: { attemptId },
       include: {
         question: { include: { options: { orderBy: { order: "asc" } } } },
-        selectedOption: true,
+        selections: true,
       },
-      orderBy: { question: { order: "asc" } },
+      orderBy: { order: "asc" },
     });
 
     const totalMarks = answers.reduce((sum, a) => sum + a.question.marks, 0);
@@ -72,17 +71,53 @@ router.get(
       testName: attempt.test.name,
       subjectName: attempt.test.subject.name,
       status: attempt.status,
+      gradingStatus: attempt.gradingStatus,
       score: attempt.score ?? 0,
       totalMarks,
       questions: answers.map((a) => ({
         questionId: a.questionId,
+        type: a.question.type,
         text: a.question.text,
         marks: a.question.marks,
         options: a.question.options.map((o) => ({ id: o.id, text: o.text, isCorrect: o.isCorrect })),
-        selectedOptionId: a.selectedOptionId,
+        selectedOptionIds: a.selections.map((s) => s.optionId),
+        textResponse: a.textResponse,
         state: a.state,
-        awarded: a.selectedOption?.isCorrect ? a.question.marks : 0,
+        awarded: a.awardedMarks,
       })),
+    });
+  })
+);
+
+router.get(
+  "/:attemptId/certificate",
+  asyncHandler(async (req, res) => {
+    const attemptId = z.coerce.number().int().parse(req.params.attemptId);
+    const attempt = await prisma.attempt.findUnique({
+      where: { id: attemptId },
+      include: {
+        student: { select: { name: true } },
+        test: { include: { subject: true } },
+        answers: { include: { question: { select: { marks: true } } } },
+      },
+    });
+    if (!attempt) throw new HttpError(404, "Result not found");
+
+    const isOwner = attempt.studentId === req.user!.userId;
+    const isAdmin = req.user!.role === "ADMIN";
+    const isOwningReviewer = req.user!.role === "STUDY_CENTER" && attempt.test.ownerId === req.user!.userId;
+    if (!isOwner && !isAdmin && !isOwningReviewer) throw new HttpError(403, "Forbidden");
+    if (attempt.status === "IN_PROGRESS") throw new HttpError(409, "This attempt has not finished yet");
+
+    const totalMarks = attempt.answers.reduce((sum, a) => sum + a.question.marks, 0);
+    streamCertificate(res, {
+      studentName: attempt.student.name,
+      testName: attempt.test.name,
+      subjectName: attempt.test.subject.name,
+      score: attempt.score ?? 0,
+      totalMarks,
+      date: attempt.endTime ?? new Date(),
+      provisional: attempt.gradingStatus === "PENDING_REVIEW",
     });
   })
 );

@@ -85,7 +85,13 @@ export function SubjectsPage() {
                   className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                 />
               ) : (
-                <p className="font-medium text-slate-800 dark:text-slate-100">{s.name}</p>
+                <div>
+                  <p className="font-medium text-slate-800 dark:text-slate-100">{s.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {s.testCount ?? 0} test{s.testCount === 1 ? "" : "s"} · {s.questionCount ?? 0} question
+                    {s.questionCount === 1 ? "" : "s"}
+                  </p>
+                </div>
               )}
               <div className="flex gap-2">
                 {editing?.id === s.id ? (

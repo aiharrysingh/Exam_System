@@ -14,8 +14,9 @@ import { AdminDashboardPage } from "./routes/admin/AdminDashboardPage";
 import { SubjectsPage } from "./routes/admin/SubjectsPage";
 import { AdminTestsPage } from "./routes/admin/AdminTestsPage";
 import { TestQuestionsPage } from "./routes/admin/TestQuestionsPage";
-import { StudyCenterDashboardPage } from "./routes/studycenter/StudyCenterDashboardPage";
-import { StudentsPage } from "./routes/studycenter/StudentsPage";
+import { QuestionBankPage } from "./routes/admin/QuestionBankPage";
+import { GradingQueuePage } from "./routes/admin/GradingQueuePage";
+import { UserManagementPage } from "./routes/admin/UserManagementPage";
 import { ReportsPage } from "./routes/studycenter/ReportsPage";
 
 export default function App() {
@@ -37,20 +38,24 @@ export default function App() {
         <Route path="/attempts/:id/summary" element={<SummaryPage />} />
       </Route>
 
-      <Route element={<RoleGuard allow={["ADMIN"]} />}>
+      {/* Shared authoring surface for ADMIN and STUDY_CENTER (test conductor) accounts —
+          the backend scopes each request to "everything" (admin) vs "just mine" (test conductor). */}
+      <Route element={<RoleGuard allow={["ADMIN", "STUDY_CENTER"]} />}>
         <Route element={<AppShell />}>
-          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-          <Route path="/admin/subjects" element={<SubjectsPage />} />
-          <Route path="/admin/tests" element={<AdminTestsPage />} />
-          <Route path="/admin/tests/:testId/questions" element={<TestQuestionsPage />} />
+          <Route path="/manage/dashboard" element={<AdminDashboardPage />} />
+          <Route path="/manage/subjects" element={<SubjectsPage />} />
+          <Route path="/manage/tests" element={<AdminTestsPage />} />
+          <Route path="/manage/tests/:testId/questions" element={<TestQuestionsPage />} />
+          <Route path="/manage/bank" element={<QuestionBankPage />} />
+          <Route path="/manage/grading" element={<GradingQueuePage />} />
+          <Route path="/manage/reports" element={<ReportsPage />} />
         </Route>
       </Route>
 
-      <Route element={<RoleGuard allow={["STUDY_CENTER"]} />}>
+      {/* Admin-only oversight: managing student and test-conductor accounts. */}
+      <Route element={<RoleGuard allow={["ADMIN"]} />}>
         <Route element={<AppShell />}>
-          <Route path="/studycenter/dashboard" element={<StudyCenterDashboardPage />} />
-          <Route path="/studycenter/students" element={<StudentsPage />} />
-          <Route path="/studycenter/reports" element={<ReportsPage />} />
+          <Route path="/admin/users" element={<UserManagementPage />} />
         </Route>
       </Route>
 

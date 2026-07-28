@@ -1,6 +1,24 @@
 import { Attempt, AttemptStatus } from "@prisma/client";
 import { prisma } from "../../lib/prisma";
 import { HttpError } from "../../lib/asyncHandler";
+import { sendMail } from "../../lib/mailer";
+import { scoreAnswer } from "./scoring";
+
+async function notifyResultReady(attemptId: number): Promise<void> {
+  const attempt = await prisma.attempt.findUnique({
+    where: { id: attemptId },
+    include: { student: true, test: true },
+  });
+  if (!attempt) return;
+  const pending = attempt.gradingStatus === "PENDING_REVIEW";
+  await sendMail(
+    attempt.student.email,
+    `Your result for "${attempt.test.name}" is ready`,
+    pending
+      ? `You scored ${attempt.score} so far on "${attempt.test.name}". Some short-answer questions are still pending manual review, so your final score may change.`
+      : `You scored ${attempt.score} on "${attempt.test.name}". Log in to ExamHub to see the full breakdown.`
+  );
+}
 
 /**
  * Computes score from currently-saved answers and closes out the attempt.
@@ -10,28 +28,61 @@ import { HttpError } from "../../lib/asyncHandler";
  * recorded duration never exceeds what was actually allotted).
  */
 async function finalizeAttempt(attemptId: number, status: "SUBMITTED" | "EXPIRED"): Promise<Attempt> {
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const attempt = await tx.attempt.findUniqueOrThrow({ where: { id: attemptId } });
-    if (attempt.status !== "IN_PROGRESS") return attempt;
+    if (attempt.status !== "IN_PROGRESS") return null;
 
     const answers = await tx.answer.findMany({
       where: { attemptId },
-      include: { question: true, selectedOption: true },
+      include: { question: { include: { options: true } }, selections: true },
     });
-    const score = answers.reduce(
-      (sum, a) => sum + (a.selectedOption?.isCorrect ? a.question.marks : 0),
-      0
-    );
+
+    const scored = answers.map((answer) => ({ id: answer.id, awarded: scoreAnswer(answer.question, answer) }));
+    for (const { id, awarded } of scored) {
+      await tx.answer.update({ where: { id }, data: { awardedMarks: awarded } });
+    }
+
+    const total = scored.reduce((sum, s) => sum + (s.awarded ?? 0), 0);
+    const gradingStatus = scored.some((s) => s.awarded === null) ? "PENDING_REVIEW" : "FULLY_GRADED";
 
     return tx.attempt.update({
       where: { id: attemptId },
       data: {
         status,
-        score,
+        score: Math.max(0, total),
+        gradingStatus,
         endTime: status === "EXPIRED" ? attempt.deadline : new Date(),
       },
     });
   });
+
+  if (result) {
+    notifyResultReady(attemptId).catch((err) => console.error("[mailer] result-ready notification failed:", err));
+    return result;
+  }
+  return prisma.attempt.findUniqueOrThrow({ where: { id: attemptId } });
+}
+
+/**
+ * Re-sums an attempt's score from already-persisted `Answer.awardedMarks`
+ * (never re-derives correctness) — called after a manual grade is entered
+ * for a previously-pending SHORT_ANSWER answer.
+ */
+export async function recomputeScore(attemptId: number): Promise<Attempt> {
+  const before = await prisma.attempt.findUniqueOrThrow({ where: { id: attemptId } });
+  const updated = await prisma.$transaction(async (tx) => {
+    const answers = await tx.answer.findMany({ where: { attemptId } });
+    const total = answers.reduce((sum, a) => sum + (a.awardedMarks ?? 0), 0);
+    const gradingStatus = answers.some((a) => a.awardedMarks === null) ? "PENDING_REVIEW" : "FULLY_GRADED";
+    return tx.attempt.update({
+      where: { id: attemptId },
+      data: { score: Math.max(0, total), gradingStatus },
+    });
+  });
+  if (before.gradingStatus === "PENDING_REVIEW" && updated.gradingStatus === "FULLY_GRADED") {
+    notifyResultReady(attemptId).catch((err) => console.error("[mailer] final-result notification failed:", err));
+  }
+  return updated;
 }
 
 /**

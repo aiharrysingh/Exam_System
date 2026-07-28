@@ -13,6 +13,8 @@ import { testQuestionsRouter, questionsRouter, optionsRouter } from "./modules/q
 import attemptRoutes, { testStartRouter } from "./modules/attempts/routes";
 import resultRoutes from "./modules/results/routes";
 import studyCenterRoutes from "./modules/studycenter/routes";
+import adminUsersRoutes from "./modules/adminUsers/routes";
+import gradingRoutes from "./modules/grading/routes";
 import { errorHandler } from "./middleware/errorHandler";
 import { sweepExpiredAttempts } from "./modules/attempts/service";
 
@@ -37,6 +39,8 @@ app.use("/api/options", optionsRouter);
 app.use("/api/attempts", attemptRoutes);
 app.use("/api/results", resultRoutes);
 app.use("/api/studycenter", studyCenterRoutes);
+app.use("/api/admin/users", adminUsersRoutes);
+app.use("/api/grading", gradingRoutes);
 
 app.use(errorHandler);
 

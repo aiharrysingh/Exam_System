@@ -7,6 +7,17 @@ import { ensureActiveOrFinalize, loadOwnedAttempt, submitAttempt } from "./servi
 
 const studentOnly = [authMiddleware, requireRole("STUDENT")];
 
+const MAX_TIME_PER_SAVE_SEC = 1800; // clamp: this is analytics instrumentation, not exam-integrity-grade
+
+function shuffle<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 /** Mounted at /api/tests — the one attempt-related route that hangs off a test id. */
 export const testStartRouter = Router();
 
@@ -20,7 +31,10 @@ testStartRouter.post(
     const { code } = startSchema.parse(req.body);
     const studentId = req.user!.userId;
 
-    const test = await prisma.test.findUnique({ where: { id: testId }, include: { questions: true } });
+    const test = await prisma.test.findUnique({
+      where: { id: testId },
+      include: { testQuestions: { orderBy: { order: "asc" } } },
+    });
     if (!test || !test.isPublished) throw new HttpError(404, "Test not found");
 
     const now = new Date();
@@ -30,7 +44,7 @@ testStartRouter.post(
     if (test.code !== code) {
       throw new HttpError(400, "Incorrect test code");
     }
-    if (test.questions.length === 0) {
+    if (test.testQuestions.length === 0) {
       throw new HttpError(400, "This test has no questions yet");
     }
 
@@ -44,13 +58,20 @@ testStartRouter.post(
       throw new HttpError(409, "You have already attempted this test");
     }
 
+    // Pooling implies picking a random subset (which also randomizes order); otherwise
+    // shuffleQuestions alone just reorders the full attached set.
+    let selected = test.testQuestions;
+    if (test.poolSize && test.poolSize < selected.length) {
+      selected = shuffle(selected).slice(0, test.poolSize);
+    } else if (test.shuffleQuestions) {
+      selected = shuffle(selected);
+    }
+
     const deadline = new Date(now.getTime() + test.durationMin * 60_000);
     const attempt = await prisma.$transaction(async (tx) => {
-      const created = await tx.attempt.create({
-        data: { studentId, testId, deadline },
-      });
+      const created = await tx.attempt.create({ data: { studentId, testId, deadline } });
       await tx.answer.createMany({
-        data: test.questions.map((q) => ({ attemptId: created.id, questionId: q.id })),
+        data: selected.map((tq, i) => ({ attemptId: created.id, questionId: tq.questionId, order: i + 1 })),
       });
       return created;
     });
@@ -101,8 +122,7 @@ router.get(
     const test = await prisma.test.findUniqueOrThrow({ where: { id: attempt.testId } });
     const answers = await prisma.answer.findMany({
       where: { attemptId },
-      include: { question: true },
-      orderBy: { question: { order: "asc" } },
+      orderBy: { order: "asc" },
     });
     const firstUnanswered = answers.find((a) => a.state === "UNANSWERED");
 
@@ -114,7 +134,7 @@ router.get(
       deadline: attempt.deadline,
       serverNow: new Date(),
       totalQuestions: answers.length,
-      resumeAtOrder: firstUnanswered?.question.order ?? answers[0]?.question.order ?? 1,
+      resumeAtOrder: firstUnanswered?.order ?? answers[0]?.order ?? 1,
     });
   })
 );
@@ -130,26 +150,28 @@ router.get(
       return res.status(409).json({ error: "Attempt is no longer in progress", status: attempt.status });
     }
 
-    const question = await prisma.question.findFirst({
-      where: { testId: attempt.testId, order },
-      include: { options: { orderBy: { order: "asc" }, select: { id: true, text: true, order: true } } },
+    const answer = await prisma.answer.findFirst({
+      where: { attemptId, order },
+      include: {
+        question: { include: { options: { orderBy: { order: "asc" }, select: { id: true, text: true, order: true } } } },
+        selections: true,
+      },
     });
-    if (!question) throw new HttpError(404, "Question not found");
+    if (!answer) throw new HttpError(404, "Question not found");
 
-    const totalQuestions = await prisma.question.count({ where: { testId: attempt.testId } });
-    const answer = await prisma.answer.findUnique({
-      where: { attemptId_questionId: { attemptId, questionId: question.id } },
-    });
+    const totalQuestions = await prisma.answer.count({ where: { attemptId } });
 
     res.json({
       order,
       totalQuestions,
-      questionId: question.id,
-      text: question.text,
-      marks: question.marks,
-      options: question.options,
-      selectedOptionId: answer?.selectedOptionId ?? null,
-      state: answer?.state ?? "UNANSWERED",
+      questionId: answer.question.id,
+      type: answer.question.type,
+      text: answer.question.text,
+      marks: answer.question.marks,
+      options: answer.question.options,
+      selectedOptionIds: answer.selections.map((s) => s.optionId),
+      textResponse: answer.textResponse,
+      state: answer.state,
       deadline: attempt.deadline,
       serverNow: new Date(),
     });
@@ -157,8 +179,10 @@ router.get(
 );
 
 const answerSchema = z.object({
-  selectedOptionId: z.number().int().nullable().optional(),
+  selectedOptionIds: z.array(z.number().int()).optional(),
+  textResponse: z.string().optional(),
   state: z.enum(["UNANSWERED", "ANSWERED", "MARKED_FOR_REVIEW"]),
+  timeSpentMs: z.number().int().min(0).optional(),
 });
 
 router.put(
@@ -173,11 +197,47 @@ router.put(
       return res.status(409).json({ error: "Attempt is no longer in progress", status: attempt.status });
     }
 
-    const answer = await prisma.answer.update({
-      where: { attemptId_questionId: { attemptId, questionId } },
-      data: { selectedOptionId: body.selectedOptionId ?? null, state: body.state },
+    const question = await prisma.question.findUniqueOrThrow({ where: { id: questionId } });
+    const selectedOptionIds = body.selectedOptionIds ?? [];
+    if (
+      (question.type === "SINGLE_CHOICE" || question.type === "TRUE_FALSE") &&
+      selectedOptionIds.length > 1
+    ) {
+      throw new HttpError(400, "This question allows only one selected option");
+    }
+    if (question.type === "SHORT_ANSWER" && selectedOptionIds.length > 0) {
+      throw new HttpError(400, "This question does not take selected options");
+    }
+
+    const addedSec = body.timeSpentMs
+      ? Math.min(MAX_TIME_PER_SAVE_SEC, Math.round(body.timeSpentMs / 1000))
+      : 0;
+
+    const answer = await prisma.$transaction(async (tx) => {
+      const current = await tx.answer.findUniqueOrThrow({ where: { attemptId_questionId: { attemptId, questionId } } });
+      await tx.answerOption.deleteMany({ where: { answerId: current.id } });
+      if (selectedOptionIds.length > 0) {
+        await tx.answerOption.createMany({
+          data: selectedOptionIds.map((optionId) => ({ answerId: current.id, optionId })),
+        });
+      }
+      return tx.answer.update({
+        where: { id: current.id },
+        data: {
+          textResponse: question.type === "SHORT_ANSWER" ? body.textResponse ?? null : null,
+          state: body.state,
+          timeSpentSec: { increment: addedSec },
+        },
+        include: { selections: true },
+      });
     });
-    res.json({ questionId: answer.questionId, selectedOptionId: answer.selectedOptionId, state: answer.state });
+
+    res.json({
+      questionId: answer.questionId,
+      selectedOptionIds: answer.selections.map((s) => s.optionId),
+      textResponse: answer.textResponse,
+      state: answer.state,
+    });
   })
 );
 
@@ -190,8 +250,7 @@ router.get(
 
     const answers = await prisma.answer.findMany({
       where: { attemptId },
-      include: { question: { select: { order: true } } },
-      orderBy: { question: { order: "asc" } },
+      orderBy: { order: "asc" },
     });
 
     res.json({
@@ -199,7 +258,7 @@ router.get(
       deadline: attempt.deadline,
       serverNow: new Date(),
       questions: answers.map((a) => ({
-        order: a.question.order,
+        order: a.order,
         questionId: a.questionId,
         state: a.state,
       })),
@@ -213,14 +272,16 @@ router.post(
     const attemptId = z.coerce.number().int().parse(req.params.id);
     await loadOwnedAttempt(attemptId, req.user!.userId);
     const finalized = await submitAttempt(attemptId);
-    const totalMarks = await prisma.question.aggregate({
-      where: { testId: finalized.testId },
-      _sum: { marks: true },
+    const answers = await prisma.answer.findMany({
+      where: { attemptId },
+      include: { question: { select: { marks: true } } },
     });
+    const totalMarks = answers.reduce((sum, a) => sum + a.question.marks, 0);
     res.json({
       status: finalized.status,
       score: finalized.score,
-      totalMarks: totalMarks._sum.marks ?? 0,
+      gradingStatus: finalized.gradingStatus,
+      totalMarks,
     });
   })
 );

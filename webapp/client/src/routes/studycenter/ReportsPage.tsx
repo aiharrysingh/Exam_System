@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../../lib/apiClient";
-import type { TestSummary } from "../../lib/types";
+import type { ItemAnalysisRow, TestSummary } from "../../lib/types";
 import { Card } from "../../components/ui/Card";
 import { StatCard } from "../../components/ui/StatCard";
+import { Badge } from "../../components/ui/Badge";
 import { FullPageSpinner } from "../../components/ui/Spinner";
 import { EmptyState } from "../../components/ui/EmptyState";
 
@@ -37,6 +38,11 @@ export function ReportsPage() {
   const attempts = useQuery({
     queryKey: ["studycenter", "attempts", activeTestId],
     queryFn: () => api.get<AttemptRow[]>(`/studycenter/attempts?testId=${activeTestId}`),
+    enabled: activeTestId !== null,
+  });
+  const itemAnalysis = useQuery({
+    queryKey: ["studycenter", "item-analysis", activeTestId],
+    queryFn: () => api.get<ItemAnalysisRow[]>(`/studycenter/tests/${activeTestId}/item-analysis`),
     enabled: activeTestId !== null,
   });
 
@@ -85,6 +91,58 @@ export function ReportsPage() {
             </div>
           </Card>
         </>
+      )}
+
+      {itemAnalysis.data && itemAnalysis.data.length > 0 && (
+        <Card>
+          <h2 className="mb-1 text-lg font-semibold text-slate-900 dark:text-white">Item analysis</h2>
+          <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+            Difficulty (p-value = share of attempts answered correctly) and average time spent per question.
+          </p>
+          <div className="mb-6 h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={itemAnalysis.data.map((r, i) => ({ ...r, label: `Q${i + 1}` }))}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-800" />
+                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                <YAxis domain={[0, 1]} tick={{ fontSize: 12 }} />
+                <Tooltip formatter={(v) => `${Math.round(Number(v) * 100)}%`} />
+                <Bar dataKey="pValue" fill="#06b6d4" radius={[6, 6, 0, 0]} name="p-value" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                <tr>
+                  <th className="px-3 py-2">Question</th>
+                  <th className="px-3 py-2">Attempts</th>
+                  <th className="px-3 py-2">Difficulty</th>
+                  <th className="px-3 py-2">Avg. time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itemAnalysis.data.map((row, i) => (
+                  <tr key={row.questionId} className="border-b border-slate-100 last:border-0 dark:border-slate-800">
+                    <td className="px-3 py-2 text-slate-700 dark:text-slate-200">
+                      Q{i + 1}. {row.text}
+                    </td>
+                    <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{row.attemptsCount}</td>
+                    <td className="px-3 py-2">
+                      {row.pValue === null ? (
+                        <span className="text-slate-400">—</span>
+                      ) : (
+                        <Badge tone={row.pValue < 0.4 ? "danger" : row.pValue < 0.7 ? "warning" : "success"}>
+                          {Math.round(row.pValue * 100)}% correct
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-slate-500 dark:text-slate-400">{row.avgTimeSpentSec}s</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       {attempts.data && attempts.data.length > 0 && (

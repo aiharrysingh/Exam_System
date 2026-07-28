@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
@@ -10,6 +10,8 @@ import { ExamTimer } from "../../components/ui/ExamTimer";
 import { QuestionNav, QuestionNavLegend } from "../../components/ui/QuestionNav";
 import { FullPageSpinner } from "../../components/ui/Spinner";
 
+type AnswerState = "ANSWERED" | "MARKED_FOR_REVIEW" | "UNANSWERED";
+
 export function ExamRunnerPage() {
   const { id } = useParams();
   const attemptId = Number(id);
@@ -18,7 +20,9 @@ export function ExamRunnerPage() {
   const [searchParams] = useSearchParams();
   const requestedOrder = Number(searchParams.get("order")) || null;
   const [order, setOrder] = useState<number | null>(requestedOrder);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [textResponse, setTextResponse] = useState("");
+  const questionLoadedAt = useRef(Date.now());
 
   const goToResults = useCallback(
     (message: string) => {
@@ -64,7 +68,9 @@ export function ExamRunnerPage() {
   });
 
   useEffect(() => {
-    setSelected(question.data?.selectedOptionId ?? null);
+    setSelected(question.data?.selectedOptionIds ?? []);
+    setTextResponse(question.data?.textResponse ?? "");
+    questionLoadedAt.current = Date.now();
   }, [question.data]);
 
   const summary = useQuery({
@@ -74,10 +80,12 @@ export function ExamRunnerPage() {
   });
 
   const saveAnswer = useMutation({
-    mutationFn: (params: { questionId: number; selectedOptionId: number | null; state: "ANSWERED" | "MARKED_FOR_REVIEW" | "UNANSWERED" }) =>
+    mutationFn: (params: { questionId: number; selectedOptionIds: number[]; textResponse: string; state: AnswerState; timeSpentMs: number }) =>
       api.put(`/attempts/${attemptId}/answers/${params.questionId}`, {
-        selectedOptionId: params.selectedOptionId,
+        selectedOptionIds: params.selectedOptionIds,
+        textResponse: params.textResponse || undefined,
         state: params.state,
+        timeSpentMs: params.timeSpentMs,
       }),
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {
@@ -102,13 +110,27 @@ export function ExamRunnerPage() {
     if (!submit.isPending) submit.mutate();
   }, [submit]);
 
-  async function saveAndGo(nextOrder: number | "summary", state: "ANSWERED" | "MARKED_FOR_REVIEW" | "UNANSWERED") {
+  function isAnswered() {
+    return question.data?.type === "SHORT_ANSWER" ? textResponse.trim().length > 0 : selected.length > 0;
+  }
+
+  async function saveAndGo(nextOrder: number | "summary", state: AnswerState) {
     if (!question.data) return;
-    await saveAnswer.mutateAsync({ questionId: question.data.questionId, selectedOptionId: selected, state });
+    const timeSpentMs = Date.now() - questionLoadedAt.current;
+    await saveAnswer.mutateAsync({ questionId: question.data.questionId, selectedOptionIds: selected, textResponse, state, timeSpentMs });
     if (nextOrder === "summary") {
       navigate(`/attempts/${attemptId}/summary`);
     } else {
       setOrder(nextOrder);
+    }
+  }
+
+  function toggleOption(optId: number) {
+    const type = question.data?.type;
+    if (type === "MULTI_SELECT") {
+      setSelected((prev) => (prev.includes(optId) ? prev.filter((id) => id !== optId) : [...prev, optId]));
+    } else {
+      setSelected([optId]);
     }
   }
 
@@ -135,32 +157,50 @@ export function ExamRunnerPage() {
             <FullPageSpinner />
           ) : (
             <>
-              <p className="text-lg font-medium text-slate-900 dark:text-white">{question.data.text}</p>
-              <div className="flex flex-col gap-2">
-                {question.data.options.map((opt) => (
-                  <label
-                    key={opt.id}
-                    className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition ${
-                      selected === opt.id
-                        ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20"
-                        : "border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="answer"
-                      checked={selected === opt.id}
-                      onChange={() => setSelected(opt.id)}
-                      className="accent-brand-600"
-                    />
-                    {opt.text}
-                  </label>
-                ))}
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-lg font-medium text-slate-900 dark:text-white">{question.data.text}</p>
+                {question.data.type === "MULTI_SELECT" && (
+                  <span className="shrink-0 rounded-full bg-brand-100 px-2.5 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-900/40 dark:text-brand-300">
+                    Select all that apply
+                  </span>
+                )}
               </div>
+
+              {question.data.type === "SHORT_ANSWER" ? (
+                <textarea
+                  value={textResponse}
+                  onChange={(e) => setTextResponse(e.target.value)}
+                  rows={5}
+                  placeholder="Type your answer..."
+                  className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {question.data.options.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-sm transition ${
+                        selected.includes(opt.id)
+                          ? "border-brand-500 bg-brand-50 dark:bg-brand-900/20"
+                          : "border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
+                      }`}
+                    >
+                      <input
+                        type={question.data!.type === "MULTI_SELECT" ? "checkbox" : "radio"}
+                        name="answer"
+                        checked={selected.includes(opt.id)}
+                        onChange={() => toggleOption(opt.id)}
+                        className="accent-brand-600"
+                      />
+                      {opt.text}
+                    </label>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-2 flex flex-wrap gap-2">
                 {order! > 1 && (
-                  <Button variant="secondary" onClick={() => saveAndGo(order! - 1, "ANSWERED")} disabled={saveAnswer.isPending}>
+                  <Button variant="secondary" onClick={() => saveAndGo(order! - 1, isAnswered() ? "ANSWERED" : "UNANSWERED")} disabled={saveAnswer.isPending}>
                     Previous
                   </Button>
                 )}
@@ -171,7 +211,7 @@ export function ExamRunnerPage() {
                 >
                   Mark for review
                 </Button>
-                <Button onClick={() => saveAndGo(isLast ? "summary" : order! + 1, selected ? "ANSWERED" : "UNANSWERED")} disabled={saveAnswer.isPending}>
+                <Button onClick={() => saveAndGo(isLast ? "summary" : order! + 1, isAnswered() ? "ANSWERED" : "UNANSWERED")} disabled={saveAnswer.isPending}>
                   {isLast ? "View Summary" : "Save & Next"}
                 </Button>
               </div>
@@ -185,7 +225,7 @@ export function ExamRunnerPage() {
             <QuestionNav
               items={summary.data.questions}
               currentOrder={order ?? undefined}
-              onSelect={(o) => saveAndGo(o, selected ? "ANSWERED" : "UNANSWERED")}
+              onSelect={(o) => saveAndGo(o, isAnswered() ? "ANSWERED" : "UNANSWERED")}
             />
           )}
           <QuestionNavLegend />
