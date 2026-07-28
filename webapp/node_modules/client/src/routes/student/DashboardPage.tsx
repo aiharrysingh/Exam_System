@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../../lib/apiClient";
 import type { InProgressAttempt, ResultListItem, TestSummary } from "../../lib/types";
 import { StatCard } from "../../components/ui/StatCard";
+import { Icon } from "../../components/ui/Icon";
 import { Card } from "../../components/ui/Card";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
@@ -35,10 +36,15 @@ export function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Tests available" value={tests.data?.length ?? 0} icon="📝" gradientIndex={0} />
-        <StatCard label="In progress" value={inProgress.data?.length ?? 0} icon="⏳" gradientIndex={1} />
-        <StatCard label="Completed" value={completed.length} icon="✅" gradientIndex={2} />
-        <StatCard label="Average score" value={avgPct !== null ? `${avgPct}%` : "—"} icon="📈" gradientIndex={3} />
+        <StatCard label="Tests available" value={tests.data?.length ?? 0} icon={<Icon name="list" size={20} />} tone="brand" />
+        <StatCard label="In progress" value={inProgress.data?.length ?? 0} icon={<Icon name="clock" size={20} />} tone="warning" />
+        <StatCard label="Completed" value={completed.length} icon={<Icon name="check" size={20} />} tone="success" />
+        <StatCard
+          label="Average score"
+          value={avgPct !== null ? `${avgPct}%` : "—"}
+          icon={<Icon name="trophy" size={20} />}
+          tone="accent"
+        />
       </div>
 
       {inProgress.data && inProgress.data.length > 0 && (

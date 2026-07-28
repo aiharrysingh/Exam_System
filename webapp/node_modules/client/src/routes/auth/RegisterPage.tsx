@@ -1,22 +1,20 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import { motion, useAnimationControls } from "motion/react";
 import { useRegister } from "../../lib/useAuth";
-import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
+import { notify } from "../../lib/toast";
 import { ApiError } from "../../lib/apiClient";
+import { AuthLayout } from "../../components/layout/AuthLayout";
+import { Button } from "../../components/ui/Button";
+import { Field, Input } from "../../components/ui/Field";
 
 export function RegisterPage() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    contactNo: "",
-    city: "",
-  });
+  const [form, setForm] = useState({ name: "", email: "", password: "", contactNo: "", city: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const register = useRegister();
   const navigate = useNavigate();
+  const shake = useAnimationControls();
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -26,79 +24,86 @@ export function RegisterPage() {
     e.preventDefault();
     try {
       const user = await register.mutateAsync(form);
-      toast.success(`Welcome, ${user.name}! Your account is ready.`);
+      notify.success(`Welcome, ${user.name} — your account is ready.`);
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Registration failed");
+      shake.start({ x: [0, -6, 5, -3, 0], transition: { duration: 0.4 } });
+      notify.error(err instanceof ApiError ? err.message : "Registration failed");
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-50 via-white to-accent-50 p-4 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
-      <Card className="w-full max-w-md">
-        <div className="mb-6 text-center">
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Create your student account</h1>
-        </div>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            Full name
-            <input
-              required
-              value={form.name}
-              onChange={(e) => update("name", e.target.value)}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            Email
-            <input
+    <AuthLayout
+      title="Create your account"
+      subtitle="Student registration. Administrators and test conductors are created by an admin."
+      footer={
+        <>
+          Already registered?{" "}
+          <Link to="/login" className="font-semibold text-fg-brand hover:underline">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <motion.form animate={shake} onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <Field label="Full name" required>
+          {(id) => (
+            <Input id={id} required autoComplete="name" value={form.name} onChange={(e) => update("name", e.target.value)} />
+          )}
+        </Field>
+
+        <Field label="Email" required>
+          {(id) => (
+            <Input
+              id={id}
               type="email"
+              autoComplete="email"
               required
               value={form.email}
               onChange={(e) => update("email", e.target.value)}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              placeholder="you@example.com"
             />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-            Password
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={form.password}
-              onChange={(e) => update("password", e.target.value)}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            />
-          </label>
-          <div className="grid grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              Contact no.
-              <input
-                value={form.contactNo}
-                onChange={(e) => update("contactNo", e.target.value)}
-                className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+          )}
+        </Field>
+
+        <Field label="Password" hint="At least 6 characters." required>
+          {(id) => (
+            <div className="relative">
+              <Input
+                id={id}
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                required
+                minLength={6}
+                value={form.password}
+                onChange={(e) => update("password", e.target.value)}
+                className="pr-11"
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-              City
-              <input
-                value={form.city}
-                onChange={(e) => update("city", e.target.value)}
-                className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-              />
-            </label>
-          </div>
-          <Button type="submit" disabled={register.isPending} className="mt-2 w-full">
-            {register.isPending ? "Creating account..." : "Create account"}
-          </Button>
-        </form>
-        <p className="mt-5 text-center text-sm text-slate-500 dark:text-slate-400">
-          Already registered?{" "}
-          <Link to="/login" className="font-semibold text-brand-600 dark:text-brand-400">
-            Sign in
-          </Link>
-        </p>
-      </Card>
-    </div>
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute inset-y-0 right-0 grid w-11 place-items-center text-fg-muted transition-colors hover:text-fg"
+              >
+                {showPassword ? "🙈" : "👁"}
+              </button>
+            </div>
+          )}
+        </Field>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Contact no.">
+            {(id) => <Input id={id} value={form.contactNo} onChange={(e) => update("contactNo", e.target.value)} />}
+          </Field>
+          <Field label="City">
+            {(id) => <Input id={id} value={form.city} onChange={(e) => update("city", e.target.value)} />}
+          </Field>
+        </div>
+
+        <Button type="submit" size="lg" loading={register.isPending} className="mt-2 w-full">
+          Create account
+        </Button>
+      </motion.form>
+    </AuthLayout>
   );
 }

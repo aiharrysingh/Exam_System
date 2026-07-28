@@ -1,39 +1,42 @@
 import type { ReactNode } from "react";
+import { motion } from "motion/react";
 import clsx from "clsx";
-import { Card } from "./Card";
+import { fadeInUp } from "../../lib/motion";
+import { AnimatedNumber } from "./AnimatedNumber";
+import { IconTile, type Tone } from "./IconTile";
 
-const gradients = [
-  "from-violet-500 to-fuchsia-500",
-  "from-cyan-500 to-blue-500",
-  "from-amber-500 to-orange-500",
-  "from-emerald-500 to-teal-500",
-];
-
-export function StatCard({
-  label,
-  value,
-  icon,
-  gradientIndex = 0,
-}: {
+interface Props {
   label: string;
-  value: ReactNode;
+  /** Numbers spin up; strings render as-is. */
+  value: number | string;
   icon?: ReactNode;
-  gradientIndex?: number;
-}) {
+  tone?: Tone;
+  format?: (n: number) => string;
+  hint?: string;
+  className?: string;
+}
+
+export function StatCard({ label, value, icon, tone = "brand", format, hint, className }: Props) {
   return (
-    <Card className="flex items-center gap-4">
-      <div
-        className={clsx(
-          "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white text-xl",
-          gradients[gradientIndex % gradients.length]
-        )}
-      >
-        {icon}
+    <motion.div
+      variants={fadeInUp}
+      className={clsx(
+        "flex items-center gap-4 rounded-xl border border-border-subtle bg-surface-1 p-5 shadow-e2",
+        className
+      )}
+    >
+      {icon && (
+        <IconTile tone={tone} size="md">
+          {icon}
+        </IconTile>
+      )}
+      <div className="min-w-0">
+        <p className="text-2xl font-bold tracking-tight text-fg">
+          {typeof value === "number" ? <AnimatedNumber value={value} format={format} /> : value}
+        </p>
+        <p className="truncate text-sm text-fg-muted">{label}</p>
+        {hint && <p className="mt-0.5 truncate text-2xs text-fg-muted">{hint}</p>}
       </div>
-      <div>
-        <p className="text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
-        <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
-      </div>
-    </Card>
+    </motion.div>
   );
 }

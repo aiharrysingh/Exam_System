@@ -6,6 +6,7 @@ import type { ItemAnalysisRow, TestSummary } from "../../lib/types";
 import { Card } from "../../components/ui/Card";
 import { StatCard } from "../../components/ui/StatCard";
 import { Badge } from "../../components/ui/Badge";
+import { Icon } from "../../components/ui/Icon";
 import { FullPageSpinner } from "../../components/ui/Spinner";
 import { EmptyState } from "../../components/ui/EmptyState";
 
@@ -71,9 +72,14 @@ export function ReportsPage() {
       {stats.data && (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-            <StatCard label="Attempts" value={stats.data.attemptCount} icon="✍️" gradientIndex={0} />
-            <StatCard label="Average score" value={stats.data.averageScore.toFixed(1)} icon="📈" gradientIndex={1} />
-            <StatCard label="Total marks" value={stats.data.totalMarks} icon="🎯" gradientIndex={2} />
+            <StatCard label="Attempts" value={stats.data.attemptCount} icon={<Icon name="pencil" size={20} />} tone="brand" />
+            <StatCard
+              label="Average score"
+              value={stats.data.averageScore.toFixed(1)}
+              icon={<Icon name="chart" size={20} />}
+              tone="accent"
+            />
+            <StatCard label="Total marks" value={stats.data.totalMarks} icon={<Icon name="trophy" size={20} />} tone="success" />
           </div>
 
           <Card>

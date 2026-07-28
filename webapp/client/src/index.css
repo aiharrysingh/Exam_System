@@ -1,37 +1,204 @@
 @import "tailwindcss";
 
+/* Attribute-driven dark mode. Tailwind v4's default `dark:` variant is
+   media-query based, which makes a manual theme toggle impossible. `useTheme`
+   always writes a RESOLVED "light" | "dark" to <html data-theme>, never leaves
+   it absent — if it were absent every dark: utility would silently die. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 @theme {
-  --color-brand-50: #f5f3ff;
-  --color-brand-100: #ede9fe;
-  --color-brand-200: #ddd6fe;
-  --color-brand-300: #c4b5fd;
-  --color-brand-400: #a78bfa;
-  --color-brand-500: #8b5cf6;
-  --color-brand-600: #7c3aed;
-  --color-brand-700: #6d28d9;
-  --color-brand-800: #5b21b6;
-  --color-brand-900: #4c1d95;
+  /* ---- Brand: "ink violet". Desaturated vs stock Tailwind violet so it reads
+     institutional rather than toy. brand-600 on white = 6.30:1 (AA). ---- */
+  --color-brand-50: #f5f4ff;
+  --color-brand-100: #eceafe;
+  --color-brand-200: #d8d3fc;
+  --color-brand-300: #bbb2f8;
+  --color-brand-400: #978bf0;
+  --color-brand-500: #7565e4;
+  --color-brand-600: #5b4bcc;
+  --color-brand-700: #4a3ca8;
+  --color-brand-800: #3c3186;
+  --color-brand-900: #2e266b;
+  --color-brand-950: #1c1745;
 
+  /* ---- Accent: signal teal. GRAPHICS + CHARTS ONLY at 500 and below —
+     accent-500 on white is 3.01:1 and must never carry body text. ---- */
   --color-accent-50: #ecfeff;
-  --color-accent-400: #22d3ee;
-  --color-accent-500: #06b6d4;
-  --color-accent-600: #0891b2;
+  --color-accent-100: #cffafe;
+  --color-accent-200: #a5f0f7;
+  --color-accent-300: #67e0ec;
+  --color-accent-400: #2dc7d8;
+  --color-accent-500: #0fa3b8;
+  --color-accent-600: #0b7f92;
+  --color-accent-700: #0e6474;
 
-  --font-sans: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  /* ---- Neutrals: "ink". A trace of violet so greys sit under the brand.
+     ink-500 (#6E6E86) is 4.99:1 on white — the obvious #82829A fails at 3.74. ---- */
+  --color-ink-25: #fbfbfd;
+  --color-ink-50: #f7f7fa;
+  --color-ink-100: #efeff4;
+  --color-ink-200: #e2e2ea;
+  --color-ink-300: #c9c9d4;
+  --color-ink-400: #9a9aab;
+  --color-ink-500: #6e6e86;
+  --color-ink-600: #565669;
+  --color-ink-700: #3e3e4e;
+  --color-ink-800: #2a2a37;
+  --color-ink-900: #17171f;
+  --color-ink-950: #0c0c12;
+
+  /* ---- Status ---- */
+  --color-success-50: #ecfdf3;
+  --color-success-100: #d1fadf;
+  --color-success-500: #12b76a;
+  --color-success-600: #039855;
+  --color-success-700: #027a48;
+  --color-warning-50: #fffaeb;
+  --color-warning-100: #fef0c7;
+  --color-warning-500: #f79009;
+  --color-warning-600: #dc6803;
+  --color-warning-700: #b54708;
+  --color-danger-50: #fef3f2;
+  --color-danger-100: #fee4e2;
+  --color-danger-500: #f04438;
+  --color-danger-600: #d92d20;
+  --color-danger-700: #b42318;
+
+  /* ---- Type ---- */
+  --font-sans: "Inter Variable", "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, monospace;
+
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.02em;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.125rem;
+  --text-xs--letter-spacing: 0.01em;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.375rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.625rem;
+  --text-lg--letter-spacing: -0.006em;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.011em;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-2xl--letter-spacing: -0.015em;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-3xl--letter-spacing: -0.019em;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-4xl--letter-spacing: -0.021em;
+  --text-display: 3rem;
+  --text-display--line-height: 3.25rem;
+  --text-display--letter-spacing: -0.025em;
+
+  /* ---- Radius rhythm: controls=lg(12) · containers=xl(16) · overlays=2xl(20) ---- */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 28px;
+
+  /* ---- Layout ---- */
+  --container-page: 1200px;
+  --spacing-sidebar: 16.5rem;
+  --spacing-header: 4rem;
 }
 
+/* ---------- Semantic layer: light ---------- */
 :root {
   color-scheme: light;
+  --surface-canvas: #f6f6fa;
+  --surface-1: #ffffff;
+  --surface-2: #fbfbfd;
+  --surface-3: #f1f1f6;
+  --surface-inverse: #17171f;
+  --border-subtle: #e9e9f0;
+  --border-default: #dddde7;
+  --border-strong: #c6c6d3;
+  --text-primary: #17171f;
+  --text-secondary: #565669;
+  --text-muted: #6e6e86;
+  --text-inverse: #ffffff;
+  --text-brand: #5b4bcc;
+  --overlay-scrim: rgb(17 17 25 / 0.45);
+  --ring-color: #7565e4;
+
+  --elev-1: 0 1px 2px 0 rgb(17 17 25 / 0.04);
+  --elev-2: 0 1px 3px 0 rgb(17 17 25 / 0.06), 0 1px 2px -1px rgb(17 17 25 / 0.04);
+  --elev-3: 0 4px 12px -2px rgb(17 17 25 / 0.08), 0 2px 4px -2px rgb(17 17 25 / 0.04);
+  --elev-4: 0 12px 28px -8px rgb(17 17 25 / 0.12), 0 4px 10px -4px rgb(17 17 25 / 0.06);
+  --elev-5: 0 24px 56px -16px rgb(17 17 25 / 0.18), 0 8px 20px -8px rgb(17 17 25 / 0.08);
+  --elev-brand: 0 8px 24px -8px rgb(91 75 204 / 0.45);
+  --hairline: 0 0 0 0 rgb(255 255 255 / 0);
 }
 
-:root[data-theme="dark"] {
+/* ---------- Semantic layer: dark ----------
+   Shadows are near-invisible on dark surfaces, so elevation is carried by
+   border strength plus an inset top hairline instead. */
+[data-theme="dark"] {
   color-scheme: dark;
+  --surface-canvas: #0c0c12;
+  --surface-1: #14141c;
+  --surface-2: #1a1a24;
+  --surface-3: #23232f;
+  --surface-inverse: #f7f7fa;
+  --border-subtle: #23232f;
+  --border-default: #2e2e3c;
+  --border-strong: #3d3d4e;
+  --text-primary: #f4f4f8;
+  --text-secondary: #a9a9bd;
+  --text-muted: #7c7c93;
+  --text-inverse: #14141c;
+  --text-brand: #978bf0;
+  --overlay-scrim: rgb(6 6 10 / 0.65);
+  --ring-color: #978bf0;
+
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --elev-2: 0 1px 2px rgb(0 0 0 / 0.5);
+  --elev-3: 0 6px 18px -6px rgb(0 0 0 / 0.6);
+  --elev-4: 0 20px 44px -16px rgb(0 0 0 / 0.7);
+  --elev-5: 0 32px 72px -24px rgb(0 0 0 / 0.8);
+  --elev-brand: 0 8px 28px -10px rgb(117 101 228 / 0.55);
+  --hairline: inset 0 1px 0 0 rgb(255 255 255 / 0.045);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    color-scheme: dark;
-  }
+/* ---------- MUST be `inline`.
+   With a plain @theme, `bg-surface-1` would compile to var(--color-surface-1),
+   which resolves once at :root and inherits as a COMPUTED value — meaning any
+   subtree theming would silently fail. `inline` emits var(--surface-1) directly
+   so it resolves at the element. ---------- */
+@theme inline {
+  --color-canvas: var(--surface-canvas);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-muted);
+  --color-fg-inverse: var(--text-inverse);
+  --color-fg-brand: var(--text-brand);
+  --color-scrim: var(--overlay-scrim);
+  --color-ring: var(--ring-color);
+
+  --shadow-e1: var(--elev-1);
+  --shadow-e2: var(--elev-2);
+  --shadow-e3: var(--elev-3);
+  --shadow-e4: var(--elev-4);
+  --shadow-e5: var(--elev-5);
+  --shadow-brand: var(--elev-brand);
+  --shadow-hairline: var(--hairline);
 }
 
 html,
@@ -40,12 +207,62 @@ body,
   height: 100%;
 }
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);
-  @apply bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100;
+  /* Inter: single-storey l, rounded quotes */
+  font-feature-settings: "cv05" 1, "ss03" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--surface-canvas);
+  color: var(--text-primary);
 }
 
-* {
-  box-sizing: border-box;
+:focus-visible {
+  outline: 2px solid var(--ring-color);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-brand-200);
+  color: var(--color-brand-900);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes pulse-ring {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }

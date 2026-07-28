@@ -3,6 +3,7 @@ import { api } from "../../lib/apiClient";
 import type { AdminTest, ManagedUser, Subject } from "../../lib/types";
 import { useCurrentUser } from "../../lib/useAuth";
 import { StatCard } from "../../components/ui/StatCard";
+import { Icon } from "../../components/ui/Icon";
 import { FullPageSpinner } from "../../components/ui/Spinner";
 
 export function AdminDashboardPage() {
@@ -30,10 +31,12 @@ export function AdminDashboardPage() {
         </p>
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Subjects" value={subjects.data?.length ?? 0} icon="📚" gradientIndex={0} />
-        <StatCard label="Total tests" value={tests.data?.length ?? 0} icon="🗂️" gradientIndex={1} />
-        <StatCard label="Published tests" value={published} icon="✅" gradientIndex={2} />
-        {isAdmin && <StatCard label="Students" value={students.data?.length ?? 0} icon="🎓" gradientIndex={3} />}
+        <StatCard label="Subjects" value={subjects.data?.length ?? 0} icon={<Icon name="book" size={20} />} tone="brand" />
+        <StatCard label="Total tests" value={tests.data?.length ?? 0} icon={<Icon name="list" size={20} />} tone="accent" />
+        <StatCard label="Published tests" value={published} icon={<Icon name="check" size={20} />} tone="success" />
+        {isAdmin && (
+          <StatCard label="Students" value={students.data?.length ?? 0} icon={<Icon name="users" size={20} />} tone="warning" />
+        )}
       </div>
     </div>
   );

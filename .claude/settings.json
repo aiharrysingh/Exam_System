@@ -5,7 +5,8 @@
       "Read(//c/Users/signity/Desktop/**)",
       "Read(//c/Users/signity/**)",
       "Bash(powershell -NoProfile -Command \"Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force\")",
-      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes\" npx prisma migrate reset --force --name feature_depth_and_ownership)"
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes\" npx prisma migrate reset --force --name feature_depth_and_ownership)",
+      "Bash(node -e ' *)"
     ]
   }
 }

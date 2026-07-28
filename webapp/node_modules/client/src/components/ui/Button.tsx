@@ -1,31 +1,69 @@
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { motion } from "motion/react";
 import clsx from "clsx";
+import { Spinner } from "./Spinner";
 
-type Variant = "primary" | "secondary" | "danger" | "ghost";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "success" | "subtle";
+type Size = "sm" | "md" | "lg";
 
-interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface Props extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "ref"> {
   variant?: Variant;
+  size?: Size;
+  loading?: boolean;
+  iconLeft?: ReactNode;
+  iconRight?: ReactNode;
 }
 
 const variants: Record<Variant, string> = {
   primary:
-    "bg-gradient-to-r from-brand-600 to-accent-500 text-white shadow-md shadow-brand-500/25 hover:brightness-110 active:brightness-95",
+    "bg-[linear-gradient(160deg,var(--color-brand-600),var(--color-brand-500))] text-white shadow-brand hover:brightness-[1.07] active:brightness-95",
   secondary:
-    "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700",
-  danger: "bg-rose-600 text-white hover:bg-rose-700",
-  ghost: "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800",
+    "bg-surface-1 text-fg border border-border-default shadow-e1 hover:bg-surface-2 hover:border-border-strong",
+  ghost: "text-fg-secondary hover:bg-surface-3 hover:text-fg",
+  subtle: "bg-brand-50 text-brand-700 hover:bg-brand-100 dark:bg-brand-500/12 dark:text-brand-300 dark:hover:bg-brand-500/20",
+  danger: "bg-danger-600 text-white shadow-e2 hover:bg-danger-700",
+  success: "bg-success-700 text-white shadow-e2 hover:bg-success-600",
 };
 
-export function Button({ variant = "primary", className, disabled, ...props }: Props) {
+const sizes: Record<Size, string> = {
+  sm: "h-8 px-3 text-xs gap-1.5 rounded-md",
+  md: "h-10 px-4 text-sm gap-2 rounded-lg",
+  lg: "h-11 px-5 text-sm gap-2 rounded-lg",
+};
+
+export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
+  { variant = "primary", size = "md", loading = false, iconLeft, iconRight, className, disabled, children, ...props },
+  ref
+) {
+  const isDisabled = disabled || loading;
   return (
-    <button
+    <motion.button
+      ref={ref}
+      whileTap={isDisabled ? undefined : { scale: 0.97 }}
+      whileHover={isDisabled || variant !== "primary" ? undefined : { y: -1 }}
+      transition={{ duration: 0.12 }}
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed",
+        "relative inline-flex select-none items-center justify-center font-semibold transition-colors",
+        "disabled:cursor-not-allowed disabled:opacity-55 disabled:shadow-none",
+        sizes[size],
         variants[variant],
         className
       )}
-      disabled={disabled}
-      {...props}
-    />
+      disabled={isDisabled}
+      aria-busy={loading || undefined}
+      {...(props as React.ComponentProps<typeof motion.button>)}
+    >
+      {/* Label stays mounted but hidden so the button never changes width while loading. */}
+      <span className={clsx("inline-flex items-center gap-2", loading && "invisible")}>
+        {iconLeft}
+        {children}
+        {iconRight}
+      </span>
+      {loading && (
+        <span className="absolute inset-0 grid place-items-center">
+          <Spinner size="sm" className={variant === "primary" || variant === "danger" || variant === "success" ? "border-white/30 border-t-white" : undefined} />
+        </span>
+      )}
+    </motion.button>
   );
-}
+});
