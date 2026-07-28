@@ -51,7 +51,9 @@ router.get(
         include: { subject: true, _count: { select: { questions: true } } },
         orderBy: { createdAt: "desc" },
       });
-      return res.json(tests);
+      return res.json(
+        tests.map(({ _count, ...t }) => ({ ...t, totalQuestions: _count.questions }))
+      );
     }
 
     if (req.user!.role === "STUDY_CENTER") {

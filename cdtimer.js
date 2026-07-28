@@ -3,7 +3,7 @@
 //* Online Examination System                   *//
 //*---------------------------------------------*//
 //* License: GNU General Public License V.3     *//
-//* Author: Manjunath Baddi                     *//
+//* Author: HarMeeT SinGh                       *//
 //* Title:  Count Down Timer                    *//
 //***********************************************//
 
