@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./apiClient";
-import { AuthUser } from "./types";
+import type { AuthUser } from "./types";
 
 export function useCurrentUser() {
   return useQuery<AuthUser | null>({

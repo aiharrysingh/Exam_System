@@ -1,122 +1,61 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { Navigate, Route, Routes } from "react-router-dom";
+import { AppShell } from "./components/layout/AppShell";
+import { RoleGuard } from "./routes/RoleGuard";
+import { LoginPage } from "./routes/auth/LoginPage";
+import { RegisterPage } from "./routes/auth/RegisterPage";
+import { DashboardPage } from "./routes/student/DashboardPage";
+import { TestsPage } from "./routes/student/TestsPage";
+import { ExamRunnerPage } from "./routes/student/ExamRunnerPage";
+import { SummaryPage } from "./routes/student/SummaryPage";
+import { ResultsListPage } from "./routes/student/ResultsListPage";
+import { ResultDetailPage } from "./routes/student/ResultDetailPage";
+import { ProfilePage } from "./routes/student/ProfilePage";
+import { AdminDashboardPage } from "./routes/admin/AdminDashboardPage";
+import { SubjectsPage } from "./routes/admin/SubjectsPage";
+import { AdminTestsPage } from "./routes/admin/AdminTestsPage";
+import { TestQuestionsPage } from "./routes/admin/TestQuestionsPage";
+import { StudyCenterDashboardPage } from "./routes/studycenter/StudyCenterDashboardPage";
+import { StudentsPage } from "./routes/studycenter/StudentsPage";
+import { ReportsPage } from "./routes/studycenter/ReportsPage";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+export default function App() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
-      <div className="ticks"></div>
+      <Route element={<RoleGuard allow={["STUDENT"]} />}>
+        <Route element={<AppShell />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/tests" element={<TestsPage />} />
+          <Route path="/results" element={<ResultsListPage />} />
+          <Route path="/results/:attemptId" element={<ResultDetailPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+        </Route>
+        {/* The exam runner and summary intentionally render outside AppShell — no sidebar distractions mid-test. */}
+        <Route path="/attempts/:id" element={<ExamRunnerPage />} />
+        <Route path="/attempts/:id/summary" element={<SummaryPage />} />
+      </Route>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <Route element={<RoleGuard allow={["ADMIN"]} />}>
+        <Route element={<AppShell />}>
+          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+          <Route path="/admin/subjects" element={<SubjectsPage />} />
+          <Route path="/admin/tests" element={<AdminTestsPage />} />
+          <Route path="/admin/tests/:testId/questions" element={<TestQuestionsPage />} />
+        </Route>
+      </Route>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <Route element={<RoleGuard allow={["STUDY_CENTER"]} />}>
+        <Route element={<AppShell />}>
+          <Route path="/studycenter/dashboard" element={<StudyCenterDashboardPage />} />
+          <Route path="/studycenter/students" element={<StudentsPage />} />
+          <Route path="/studycenter/reports" element={<ReportsPage />} />
+        </Route>
+      </Route>
+
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
 }
-
-export default App
