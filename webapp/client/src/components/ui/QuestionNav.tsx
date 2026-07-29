@@ -2,9 +2,9 @@ import clsx from "clsx";
 import type { AnswerState, SummaryItem } from "../../lib/types";
 
 const stateStyles: Record<AnswerState, string> = {
-  UNANSWERED: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
-  ANSWERED: "bg-emerald-500 text-white",
-  MARKED_FOR_REVIEW: "bg-amber-500 text-white",
+  UNANSWERED: "bg-surface-3 text-fg-muted",
+  ANSWERED: "bg-success-500 text-white",
+  MARKED_FOR_REVIEW: "bg-warning-500 text-white",
 };
 
 export function QuestionNav({
@@ -37,15 +37,15 @@ export function QuestionNav({
 
 export function QuestionNavLegend() {
   return (
-    <div className="flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400">
+    <div className="flex flex-wrap gap-3 text-xs text-fg-muted">
       <span className="flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded bg-slate-200 dark:bg-slate-700" /> Unanswered
+        <span className="h-3 w-3 rounded bg-surface-3" /> Unanswered
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded bg-emerald-500" /> Answered
+        <span className="h-3 w-3 rounded bg-success-500" /> Answered
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="h-3 w-3 rounded bg-amber-500" /> Marked for review
+        <span className="h-3 w-3 rounded bg-warning-500" /> Marked for review
       </span>
     </div>
   );

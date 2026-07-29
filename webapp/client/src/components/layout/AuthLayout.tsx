@@ -29,12 +29,12 @@ function Mesh() {
           transition={{ duration: b.dur, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" }}
         />
       ))}
-      {/* faint grid */}
+      {/* faint grid — `currentColor` so it inverts along with the panel's text */}
       <div
-        className="absolute inset-0 opacity-[0.04]"
+        className="absolute inset-0 text-fg-inverse opacity-[0.04]"
         style={{
           backgroundImage:
-            "linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)",
+            "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
           backgroundSize: "56px 56px",
         }}
       />
@@ -55,7 +55,11 @@ export function AuthLayout({
 }) {
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
-      {/* Brand panel */}
+      {/* Brand panel — deliberately the INVERSE of the form panel beside it,
+          in both themes: `surface-inverse`/`fg-inverse` are a matched pair
+          that flip together (dark-bg+white-text in light mode, light-bg+
+          dark-text in dark mode), so this panel stays high-contrast no
+          matter which theme is active — it just swaps which side is dark. */}
       <div className="relative hidden overflow-hidden bg-surface-inverse lg:block">
         <Mesh />
         <div className="relative flex h-full flex-col justify-between p-12">
@@ -66,7 +70,7 @@ export function AuthLayout({
             className="flex items-center gap-2.5"
           >
             <LogoMark />
-            <span className="text-lg font-bold tracking-tight text-white">ExamHub</span>
+            <span className="text-lg font-bold tracking-tight text-fg-inverse">ExamHub</span>
           </motion.div>
 
           <div>
@@ -74,7 +78,7 @@ export function AuthLayout({
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: duration.slower, ease: ease.out, delay: 0.08 }}
-              className="max-w-md text-3xl font-bold leading-tight tracking-tight text-white"
+              className="max-w-md text-3xl font-bold leading-tight tracking-tight text-fg-inverse"
             >
               Examinations that hold up under scrutiny.
             </motion.h2>
@@ -89,20 +93,20 @@ export function AuthLayout({
                 >
                   <span
                     aria-hidden="true"
-                    className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/10 text-sm text-white ring-1 ring-inset ring-white/15"
+                    className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-fg-inverse/10 text-sm text-fg-inverse ring-1 ring-inset ring-fg-inverse/15"
                   >
                     {p.icon}
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-white">{p.title}</p>
-                    <p className="mt-0.5 text-sm leading-relaxed text-white/60">{p.body}</p>
+                    <p className="text-sm font-semibold text-fg-inverse">{p.title}</p>
+                    <p className="mt-0.5 text-sm leading-relaxed text-fg-inverse/60">{p.body}</p>
                   </div>
                 </motion.li>
               ))}
             </ul>
           </div>
 
-          <p className="text-2xs text-white/40">© {new Date().getFullYear()} ExamHub</p>
+          <p className="text-2xs text-fg-inverse/40">© {new Date().getFullYear()} ExamHub</p>
         </div>
       </div>
 

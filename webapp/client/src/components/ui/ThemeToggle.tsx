@@ -1,10 +1,10 @@
 import clsx from "clsx";
 import { useTheme, type ThemePreference } from "../../lib/useTheme";
+import { Icon } from "./Icon";
 
-const OPTIONS: { value: ThemePreference; label: string; icon: string }[] = [
-  { value: "light", label: "Light", icon: "☀" },
-  { value: "system", label: "System", icon: "◐" },
-  { value: "dark", label: "Dark", icon: "☾" },
+const OPTIONS: { value: ThemePreference; label: string }[] = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
 ];
 
 export function ThemeToggle() {
@@ -28,13 +28,12 @@ export function ThemeToggle() {
             title={opt.label}
             onClick={() => setPreference(opt.value)}
             className={clsx(
-              "flex h-7 flex-1 items-center justify-center rounded-md text-sm transition-colors",
-              active
-                ? "bg-surface-1 text-fg shadow-e1"
-                : "text-fg-muted hover:text-fg-secondary"
+              "flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md text-xs font-semibold transition-colors",
+              active ? "bg-surface-1 text-fg shadow-e1" : "text-fg-muted hover:text-fg-secondary"
             )}
           >
-            <span aria-hidden="true">{opt.icon}</span>
+            <Icon name={opt.value === "light" ? "sun" : "moon"} size={15} strokeWidth={1.8} />
+            {opt.label}
           </button>
         );
       })}

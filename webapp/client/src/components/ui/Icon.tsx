@@ -19,7 +19,9 @@ export type IconName =
   | "plus"
   | "upload"
   | "grip"
-  | "inbox";
+  | "inbox"
+  | "sun"
+  | "moon";
 
 const paths: Record<IconName, React.ReactNode> = {
   dashboard: (
@@ -117,6 +119,17 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <path d="M4 13h4l1.5 3h5L16 13h4" />
       <path d="M5.5 5h13l1.5 8v4.5A1.5 1.5 0 0118.5 19h-13A1.5 1.5 0 014 17.5V13l1.5-8z" />
+    </>
+  ),
+  sun: (
+    <>
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.8v2.6M12 18.6v2.6M4.4 4.4l1.85 1.85M17.75 17.75l1.85 1.85M2.8 12h2.6M18.6 12h2.6M4.4 19.6l1.85-1.85M17.75 6.25l1.85-1.85" />
+    </>
+  ),
+  moon: (
+    <>
+      <path d="M20 13.8A8.2 8.2 0 1110.2 4a6.6 6.6 0 009.8 9.8z" />
     </>
   ),
 };
