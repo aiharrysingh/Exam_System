@@ -14,7 +14,7 @@ const createSchema = z.object({
   role: roleParam,
   name: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
   contactNo: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
@@ -27,7 +27,7 @@ const updateSchema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   pincode: z.string().optional(),
-  newPassword: z.string().min(6).optional(),
+  newPassword: z.string().min(8).optional(),
 });
 
 function toDto(u: {

@@ -66,7 +66,7 @@ export function RegisterPage() {
           )}
         </Field>
 
-        <Field label="Password" hint="At least 6 characters." required>
+        <Field label="Password" hint="At least 8 characters." required>
           {(id) => (
             <div className="relative">
               <Input
@@ -74,7 +74,7 @@ export function RegisterPage() {
                 type={showPassword ? "text" : "password"}
                 autoComplete="new-password"
                 required
-                minLength={6}
+                minLength={8}
                 value={form.password}
                 onChange={(e) => update("password", e.target.value)}
                 className="pr-11"

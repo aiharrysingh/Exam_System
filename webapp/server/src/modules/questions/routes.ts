@@ -7,7 +7,15 @@ import { authMiddleware, requireRole } from "../../middleware/auth";
 import { assertOwnerOrAdmin, newOwnerId, ownerFilter } from "../../lib/ownership";
 import { importQuestions, parseQuestionsCsv } from "./csvImport";
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 1024 * 1024 } });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const isCsv = file.mimetype === "text/csv" || file.originalname.toLowerCase().endsWith(".csv");
+    if (isCsv) cb(null, true);
+    else cb(new HttpError(400, "Only .csv files are accepted"));
+  },
+});
 
 const authoring = [authMiddleware, requireRole("ADMIN", "STUDY_CENTER")];
 

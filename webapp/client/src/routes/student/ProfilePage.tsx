@@ -22,7 +22,15 @@ interface Profile {
 export function ProfilePage() {
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["students", "me"], queryFn: () => api.get<Profile>("/students/me") });
-  const [form, setForm] = useState({ name: "", contactNo: "", address: "", city: "", pincode: "", newPassword: "" });
+  const [form, setForm] = useState({
+    name: "",
+    contactNo: "",
+    address: "",
+    city: "",
+    pincode: "",
+    currentPassword: "",
+    newPassword: "",
+  });
 
   useEffect(() => {
     if (data) {
@@ -32,6 +40,7 @@ export function ProfilePage() {
         address: data.address ?? "",
         city: data.city ?? "",
         pincode: data.pincode ?? "",
+        currentPassword: "",
         newPassword: "",
       });
     }
@@ -45,11 +54,13 @@ export function ProfilePage() {
         address: form.address,
         city: form.city,
         pincode: form.pincode,
-        ...(form.newPassword ? { newPassword: form.newPassword } : {}),
+        ...(form.newPassword
+          ? { newPassword: form.newPassword, currentPassword: form.currentPassword }
+          : {}),
       }),
     onSuccess: (profile) => {
       qc.setQueryData(["students", "me"], profile);
-      setForm((f) => ({ ...f, newPassword: "" }));
+      setForm((f) => ({ ...f, currentPassword: "", newPassword: "" }));
       notify.success("Profile updated");
     },
     onError: (err) => notify.error(err instanceof ApiError ? err.message : "Update failed"),
@@ -116,18 +127,33 @@ export function ProfilePage() {
               {(id) => <Input id={id} value={form.pincode} onChange={(e) => set("pincode", e.target.value)} />}
             </Field>
 
-            <div className="mt-2 border-t border-border-subtle pt-5">
-              <Field label="New password" hint="Leave blank to keep your current password. Minimum 6 characters.">
+            <div className="mt-2 flex flex-col gap-4 border-t border-border-subtle pt-5">
+              <Field label="New password" hint="Leave blank to keep your current password. Minimum 8 characters.">
                 {(id) => (
                   <Input
                     id={id}
                     type="password"
                     autoComplete="new-password"
+                    minLength={8}
                     value={form.newPassword}
                     onChange={(e) => set("newPassword", e.target.value)}
                   />
                 )}
               </Field>
+              {form.newPassword && (
+                <Field label="Current password" hint="Required to confirm the change." required>
+                  {(id) => (
+                    <Input
+                      id={id}
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      value={form.currentPassword}
+                      onChange={(e) => set("currentPassword", e.target.value)}
+                    />
+                  )}
+                </Field>
+              )}
             </div>
 
             <Button type="submit" loading={update.isPending} className="mt-2 self-start">

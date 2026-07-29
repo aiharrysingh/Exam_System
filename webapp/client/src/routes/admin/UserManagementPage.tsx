@@ -276,7 +276,7 @@ function UserFormModal({
 
         <Field
           label={isEdit ? "New password" : "Password"}
-          hint={isEdit ? "Leave blank to keep the current password." : "Minimum 6 characters."}
+          hint={isEdit ? "Leave blank to keep the current password." : "Minimum 8 characters."}
           required={!isEdit}
         >
           {(id) => (
@@ -285,7 +285,7 @@ function UserFormModal({
               type="password"
               autoComplete="new-password"
               required={!isEdit}
-              minLength={6}
+              minLength={8}
               value={form.password}
               onChange={(e) => set("password", e.target.value)}
             />

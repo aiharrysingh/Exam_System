@@ -1,11 +1,28 @@
 import { Router } from "express";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import { prisma } from "../../lib/prisma";
 import { asyncHandler, HttpError } from "../../lib/asyncHandler";
 import { authMiddleware, requireRole } from "../../middleware/auth";
 import { ensureActiveOrFinalize, loadOwnedAttempt, submitAttempt } from "./service";
 
 const studentOnly = [authMiddleware, requireRole("STUDENT")];
+
+/**
+ * Test `code` is a shared secret with no length/format floor (seed data has
+ * codes as short as "123") — without this, an authenticated student could
+ * script repeated guesses against a testId until one lands. Keyed by IP+user
+ * rather than IP alone so one bad actor on a shared school network can't
+ * lock out everyone else on it.
+ */
+const startAttemptLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${req.user?.userId ?? "anon"}`,
+  message: { error: "Too many attempts to start this test. Please wait a while and try again." },
+});
 
 const MAX_TIME_PER_SAVE_SEC = 1800; // clamp: this is analytics instrumentation, not exam-integrity-grade
 
@@ -26,6 +43,7 @@ const startSchema = z.object({ code: z.string().min(1) });
 testStartRouter.post(
   "/:id/start",
   ...studentOnly,
+  startAttemptLimiter,
   asyncHandler(async (req, res) => {
     const testId = z.coerce.number().int().parse(req.params.id);
     const { code } = startSchema.parse(req.body);

@@ -21,6 +21,14 @@ import { sweepExpiredAttempts } from "./modules/attempts/service";
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
+// The `cors` package treats a falsy `origin` as "allow any origin" (reflects
+// `*`). Combined with `credentials: true` that's an invalid combination browsers
+// reject outright, so a missing env var doesn't leak — it just breaks CORS
+// entirely and confusingly. Fail fast at boot instead, same as JWT_SECRET.
+if (!process.env.CLIENT_ORIGIN) {
+  throw new Error("CLIENT_ORIGIN is not set");
+}
+
 app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_ORIGIN, credentials: true }));
 app.use(express.json());

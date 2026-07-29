@@ -19,7 +19,7 @@ const COOKIE_OPTIONS = {
 const registerSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(8),
   contactNo: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
@@ -29,6 +29,16 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+});
+
+// Separate limiter instances — sharing one would let a burst of registration
+// attempts from an IP eat into that same IP's login budget, and vice versa.
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts, please try again later." },
 });
 
 const loginLimiter = rateLimit({
@@ -41,7 +51,7 @@ const loginLimiter = rateLimit({
 
 router.post(
   "/register",
-  loginLimiter,
+  registerLimiter,
   asyncHandler(async (req, res) => {
     const body = registerSchema.parse(req.body);
     const existing = await prisma.user.findUnique({ where: { email: body.email } });
