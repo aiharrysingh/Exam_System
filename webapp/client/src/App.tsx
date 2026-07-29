@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { RoleGuard } from "./routes/RoleGuard";
@@ -10,14 +11,22 @@ import { SummaryPage } from "./routes/student/SummaryPage";
 import { ResultsListPage } from "./routes/student/ResultsListPage";
 import { ResultDetailPage } from "./routes/student/ResultDetailPage";
 import { ProfilePage } from "./routes/student/ProfilePage";
-import { AdminDashboardPage } from "./routes/admin/AdminDashboardPage";
-import { SubjectsPage } from "./routes/admin/SubjectsPage";
-import { AdminTestsPage } from "./routes/admin/AdminTestsPage";
-import { TestQuestionsPage } from "./routes/admin/TestQuestionsPage";
-import { QuestionBankPage } from "./routes/admin/QuestionBankPage";
-import { GradingQueuePage } from "./routes/admin/GradingQueuePage";
-import { UserManagementPage } from "./routes/admin/UserManagementPage";
-import { ReportsPage } from "./routes/studycenter/ReportsPage";
+import { SkeletonPage } from "./components/ui/Skeleton";
+
+// Authoring/admin surfaces are code-split out of the student bundle — a
+// STUDENT session never pays for recharts, dnd-kit, or the CSV importer.
+const AdminDashboardPage = lazy(() => import("./routes/admin/AdminDashboardPage").then((m) => ({ default: m.AdminDashboardPage })));
+const SubjectsPage = lazy(() => import("./routes/admin/SubjectsPage").then((m) => ({ default: m.SubjectsPage })));
+const AdminTestsPage = lazy(() => import("./routes/admin/AdminTestsPage").then((m) => ({ default: m.AdminTestsPage })));
+const TestQuestionsPage = lazy(() => import("./routes/admin/TestQuestionsPage").then((m) => ({ default: m.TestQuestionsPage })));
+const QuestionBankPage = lazy(() => import("./routes/admin/QuestionBankPage").then((m) => ({ default: m.QuestionBankPage })));
+const GradingQueuePage = lazy(() => import("./routes/admin/GradingQueuePage").then((m) => ({ default: m.GradingQueuePage })));
+const UserManagementPage = lazy(() => import("./routes/admin/UserManagementPage").then((m) => ({ default: m.UserManagementPage })));
+const ReportsPage = lazy(() => import("./routes/studycenter/ReportsPage").then((m) => ({ default: m.ReportsPage })));
+
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<SkeletonPage stats={4} rows={4} />}>{children}</Suspense>;
+}
 
 export default function App() {
   return (
@@ -42,20 +51,20 @@ export default function App() {
           the backend scopes each request to "everything" (admin) vs "just mine" (test conductor). */}
       <Route element={<RoleGuard allow={["ADMIN", "STUDY_CENTER"]} />}>
         <Route element={<AppShell />}>
-          <Route path="/manage/dashboard" element={<AdminDashboardPage />} />
-          <Route path="/manage/subjects" element={<SubjectsPage />} />
-          <Route path="/manage/tests" element={<AdminTestsPage />} />
-          <Route path="/manage/tests/:testId/questions" element={<TestQuestionsPage />} />
-          <Route path="/manage/bank" element={<QuestionBankPage />} />
-          <Route path="/manage/grading" element={<GradingQueuePage />} />
-          <Route path="/manage/reports" element={<ReportsPage />} />
+          <Route path="/manage/dashboard" element={<LazyPage><AdminDashboardPage /></LazyPage>} />
+          <Route path="/manage/subjects" element={<LazyPage><SubjectsPage /></LazyPage>} />
+          <Route path="/manage/tests" element={<LazyPage><AdminTestsPage /></LazyPage>} />
+          <Route path="/manage/tests/:testId/questions" element={<LazyPage><TestQuestionsPage /></LazyPage>} />
+          <Route path="/manage/bank" element={<LazyPage><QuestionBankPage /></LazyPage>} />
+          <Route path="/manage/grading" element={<LazyPage><GradingQueuePage /></LazyPage>} />
+          <Route path="/manage/reports" element={<LazyPage><ReportsPage /></LazyPage>} />
         </Route>
       </Route>
 
       {/* Admin-only oversight: managing student and test-conductor accounts. */}
       <Route element={<RoleGuard allow={["ADMIN"]} />}>
         <Route element={<AppShell />}>
-          <Route path="/admin/users" element={<UserManagementPage />} />
+          <Route path="/admin/users" element={<LazyPage><UserManagementPage /></LazyPage>} />
         </Route>
       </Route>
 

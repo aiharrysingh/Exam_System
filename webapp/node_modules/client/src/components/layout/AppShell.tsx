@@ -149,6 +149,12 @@ export function AppShell() {
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <a
+        href="#main-content"
+        className="sr-only focus-visible:not-sr-only focus-visible:fixed focus-visible:left-4 focus-visible:top-4 focus-visible:z-[100] focus-visible:rounded-lg focus-visible:bg-surface-1 focus-visible:px-4 focus-visible:py-2 focus-visible:text-sm focus-visible:font-semibold focus-visible:text-fg focus-visible:shadow-e4"
+      >
+        Skip to content
+      </a>
       {/* Desktop sidebar */}
       <aside className="hidden w-sidebar shrink-0 flex-col overflow-y-auto border-r border-border-subtle bg-surface-1 p-4 md:flex">
         <div className="mb-7 px-1 pt-1">
@@ -212,8 +218,10 @@ export function AppShell() {
         </header>
 
         <main
+          id="main-content"
+          tabIndex={-1}
           data-scroll-container
-          className="flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+          className="flex-1 overflow-y-auto outline-none [scrollbar-gutter:stable]"
         >
           <div className="mx-auto w-full max-w-page p-4 sm:p-6 lg:p-8">
             <PageTransition>

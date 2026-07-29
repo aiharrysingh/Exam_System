@@ -128,7 +128,13 @@ testQuestionsRouter.delete(
     const testId = z.coerce.number().int().parse(req.params.testId);
     await loadOwnedTest(testId, req);
     const testQuestionId = z.coerce.number().int().parse(req.params.testQuestionId);
-    await prisma.testQuestion.delete({ where: { id: testQuestionId } });
+    await prisma.$transaction(async (tx) => {
+      await tx.testQuestion.delete({ where: { id: testQuestionId } });
+      // Renumber to a dense 1..N so a later attach (which appends at count+1)
+      // never lands on an order a detach left behind mid-sequence.
+      const remaining = await tx.testQuestion.findMany({ where: { testId }, orderBy: { order: "asc" } });
+      await renumber(tx, remaining);
+    });
     res.status(204).send();
   })
 );
@@ -155,6 +161,41 @@ testQuestionsRouter.put(
     res.status(204).send();
   })
 );
+
+/**
+ * Full-list reorder for drag-and-drop. Body is the complete set of
+ * testQuestionIds for this test, in the desired final order. Renumbers
+ * everything 1..N in one transaction rather than chaining N-1 pairwise
+ * swaps through the single-move endpoint above.
+ */
+testQuestionsRouter.put(
+  "/:testId/questions/order",
+  ...authoring,
+  asyncHandler(async (req, res) => {
+    const testId = z.coerce.number().int().parse(req.params.testId);
+    await loadOwnedTest(testId, req);
+    const orderedIds = z.array(z.number().int()).min(1).parse(req.body.order);
+
+    await prisma.$transaction(async (tx) => {
+      const links = await tx.testQuestion.findMany({ where: { testId } });
+      if (links.length !== orderedIds.length || !links.every((l) => orderedIds.includes(l.id))) {
+        throw new HttpError(400, "The submitted order must contain exactly the test's current questions");
+      }
+      const byId = new Map(links.map((l) => [l.id, l]));
+      await renumber(tx, orderedIds.map((id) => byId.get(id)!));
+    });
+    res.status(204).send();
+  })
+);
+
+/** Two-pass renumber to 1..N (by array position) — negatives first, since they can never collide with the positive slots being vacated. */
+async function renumber(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  linksInOrder: { id: number }[]
+) {
+  await Promise.all(linksInOrder.map((l, i) => tx.testQuestion.update({ where: { id: l.id }, data: { order: -(i + 1) } })));
+  await Promise.all(linksInOrder.map((l, i) => tx.testQuestion.update({ where: { id: l.id }, data: { order: i + 1 } })));
+}
 
 /** Mounted at /api/questions — the bank itself. */
 export const questionsRouter = Router();
